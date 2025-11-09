@@ -3,11 +3,7 @@
 use alloc::string::ToString;
 
 use super::{
-  FieldNode,
-  FieldPayload,
-  FieldValueRef,
-  SerializationError,
-  bincode_serializer::BincodeSerializer,
+  FieldNode, FieldPayload, FieldValueRef, SerializationError, bincode_serializer::BincodeSerializer,
   serializer::SerializerHandle,
 };
 

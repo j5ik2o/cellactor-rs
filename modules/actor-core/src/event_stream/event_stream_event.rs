@@ -6,7 +6,7 @@ mod tests;
 use crate::{
   NoStdToolbox, RuntimeToolbox,
   dead_letter::DeadLetterEntryGeneric,
-  event_stream::SerializationAuditEvent,
+  event_stream::{SerializationAuditEvent, SerializationEvent},
   lifecycle::LifecycleEvent,
   logging::LogEvent,
   mailbox::MailboxMetricsEvent,
@@ -30,6 +30,8 @@ pub enum EventStreamEvent<TB: RuntimeToolbox = NoStdToolbox> {
   AdapterFailure(AdapterFailureEvent),
   /// Serialization audit report.
   SerializationAudit(SerializationAuditEvent),
+  /// Serialization runtime telemetry observation.
+  Serialization(SerializationEvent),
 }
 
 impl<TB: RuntimeToolbox> Clone for EventStreamEvent<TB> {
@@ -42,6 +44,7 @@ impl<TB: RuntimeToolbox> Clone for EventStreamEvent<TB> {
       | Self::UnhandledMessage(event) => Self::UnhandledMessage(event.clone()),
       | Self::AdapterFailure(event) => Self::AdapterFailure(event.clone()),
       | Self::SerializationAudit(event) => Self::SerializationAudit(event.clone()),
+      | Self::Serialization(event) => Self::Serialization(event.clone()),
     }
   }
 }

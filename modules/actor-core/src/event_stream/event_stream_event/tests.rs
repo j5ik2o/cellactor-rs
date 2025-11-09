@@ -10,6 +10,7 @@ use crate::{
   NoStdToolbox,
   actor_prim::Pid,
   dead_letter::DeadLetterEntry,
+  event_stream::{SerializationEvent, SerializationEventKind},
   lifecycle::{LifecycleEvent, LifecycleStage},
   logging::{LogEvent, LogLevel},
   mailbox::MailboxMetricsEvent,
@@ -96,4 +97,18 @@ fn event_stream_event_debug() {
     LifecycleEvent::new(Pid::new(1, 0), None, String::from("test"), LifecycleStage::Started, Duration::from_secs(0));
   let event = EventStreamEvent::<NoStdToolbox>::Lifecycle(lifecycle_event);
   assert_debug(&event);
+}
+
+#[cfg(feature = "alloc")]
+#[test]
+fn event_stream_event_serialization_clone() {
+  let telemetry_event = SerializationEvent::new(5u128, SerializationEventKind::Success);
+  let event = EventStreamEvent::<NoStdToolbox>::Serialization(telemetry_event.clone());
+  let cloned = event.clone();
+  match (event, cloned) {
+    | (EventStreamEvent::Serialization(original), EventStreamEvent::Serialization(copy)) => {
+      assert_eq!(original.field_path_hash(), copy.field_path_hash());
+    },
+    | _ => panic!("Expected Serialization variants"),
+  }
 }

@@ -4,7 +4,7 @@ use alloc::format;
 
 use cellactor_utils_core_rs::sync::ArcShared;
 
-use super::{field_node::FieldNode, field_path_hash::FieldPathHash, registry::SerializerRegistry, SerializationError};
+use super::{SerializationError, field_node::FieldNode, field_path_hash::FieldPathHash, registry::SerializerRegistry};
 use crate::RuntimeToolbox;
 
 /// Policy entry describing whether a field may use external serialization.
@@ -51,8 +51,8 @@ impl<TB: RuntimeToolbox + 'static> ExternalSerializerPolicy<TB> {
   /// Ensures the provided field may leverage external serializers.
   pub(super) fn enforce(&self, field: &FieldNode) -> Result<(), SerializationError> {
     match self.registry.field_policy(field.path_hash()) {
-      Some(true) => Ok(()),
-      _ => Err(SerializationError::SerializationFailed(format!(
+      | Some(true) => Ok(()),
+      | _ => Err(SerializationError::SerializationFailed(format!(
         "external serializer not allowed for field {}",
         field.display().as_str()
       ))),

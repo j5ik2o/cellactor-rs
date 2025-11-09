@@ -10,16 +10,18 @@ use cellactor_utils_core_rs::sync::ArcShared;
 use serde::{Serialize, de::DeserializeOwned};
 
 use super::super::{
-  bincode_serializer::BincodeSerializer, error::SerializationError, nested_serializer_orchestrator::NestedSerializerOrchestrator,
-  payload::SerializedPayload, pekko_serializable::PekkoSerializable, registry::SerializerRegistry,
-  serialization_telemetry::{NoopSerializationTelemetry, SerializationTelemetry}, serializer::SerializerHandle,
+  bincode_serializer::BincodeSerializer, error::SerializationError,
+  nested_serializer_orchestrator::NestedSerializerOrchestrator, payload::SerializedPayload,
+  pekko_serializable::PekkoSerializable, registry::SerializerRegistry, serialization_telemetry::SerializationTelemetry,
+  serializer::SerializerHandle, telemetry_config::TelemetryConfig, telemetry_service::TelemetryService,
 };
-use crate::{RuntimeToolbox, extension::Extension};
+use crate::{RuntimeToolbox, event_stream::EventStreamGeneric, extension::Extension};
 
 /// Serialization extension that manages serializer registration and bindings.
 pub struct Serialization<TB: RuntimeToolbox + 'static> {
-  registry: ArcShared<SerializerRegistry<TB>>,
+  registry:     ArcShared<SerializerRegistry<TB>>,
   orchestrator: NestedSerializerOrchestrator<TB>,
+  telemetry:    ArcShared<TelemetryService<TB>>,
 }
 
 impl<TB: RuntimeToolbox + 'static> Extension<TB> for Serialization<TB> {}
@@ -28,15 +30,16 @@ unsafe impl<TB: RuntimeToolbox + 'static> Send for Serialization<TB> {}
 unsafe impl<TB: RuntimeToolbox + 'static> Sync for Serialization<TB> {}
 
 impl<TB: RuntimeToolbox + 'static> Serialization<TB> {
-  pub(super) fn new() -> Self {
+  pub(super) fn new(event_stream: ArcShared<EventStreamGeneric<TB>>) -> Self {
     let registry = ArcShared::new(SerializerRegistry::new());
     let handle = SerializerHandle::new(BincodeSerializer);
     if let Err(error) = registry.register_serializer(handle) {
       panic!("failed to register built-in serializer: {error}");
     }
-    let telemetry: ArcShared<dyn SerializationTelemetry> = ArcShared::new(NoopSerializationTelemetry::new());
-    let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry);
-    Self { registry, orchestrator }
+    let telemetry_impl = ArcShared::new(TelemetryService::new(event_stream, TelemetryConfig::default()));
+    let telemetry_trait: ArcShared<dyn SerializationTelemetry> = telemetry_impl.clone();
+    let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry_trait);
+    Self { registry, orchestrator, telemetry: telemetry_impl }
   }
 
   /// Serializes the provided value into a [`SerializedPayload`].
@@ -84,6 +87,12 @@ impl<TB: RuntimeToolbox + 'static> Serialization<TB> {
   #[must_use]
   pub fn registry(&self) -> ArcShared<SerializerRegistry<TB>> {
     self.registry.clone()
+  }
+
+  /// Returns the telemetry backend used by the serialization subsystem.
+  #[must_use]
+  pub fn telemetry(&self) -> ArcShared<TelemetryService<TB>> {
+    self.telemetry.clone()
   }
 
   /// Registers the default serializer/manifest pair for a Pekko-compatible type.

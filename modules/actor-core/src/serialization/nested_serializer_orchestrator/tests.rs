@@ -12,9 +12,9 @@ use super::NestedSerializerOrchestrator;
 use crate::{
   NoStdToolbox,
   serialization::{
-    AggregateSchemaBuilder, BincodeSerializer, FieldPath, FieldPathDisplay, FieldPathHash, FieldPathSegment, SerializerHandle,
-    SerializerRegistry, TraversalPolicy, SerializationError, SerializationTelemetry,
-    NoopSerializationTelemetry,
+    AggregateSchemaBuilder, BincodeSerializer, FieldPath, FieldPathDisplay, FieldPathHash, FieldPathSegment,
+    NoopSerializationTelemetry, SerializationError, SerializationTelemetry, SerializerHandle, SerializerRegistry,
+    TraversalPolicy,
   },
 };
 
@@ -23,7 +23,7 @@ struct Leaf(u32);
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 struct EnvelopeAggregate {
-  first: Leaf,
+  first:  Leaf,
   second: Leaf,
 }
 
@@ -45,13 +45,12 @@ fn orchestrator_serializes_aggregate_as_field_envelope() {
   let handle = SerializerHandle::new(BincodeSerializer::new());
   registry.register_serializer(handle.clone()).expect("register handle");
   registry.bind_type::<Leaf, _>(&handle, Some("leaf".into()), decode_leaf).expect("bind leaf");
-  registry
-    .bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope)
-    .expect("bind env");
+  registry.bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope).expect("bind env");
 
   register_envelope_schema(&registry);
 
-  let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), ArcShared::new(NoopSerializationTelemetry::new()));
+  let orchestrator =
+    NestedSerializerOrchestrator::new(registry.clone(), ArcShared::new(NoopSerializationTelemetry::new()));
   let aggregate = EnvelopeAggregate { first: Leaf(7), second: Leaf(9) };
   let payload = orchestrator.serialize(&aggregate).expect("serialize");
 
@@ -80,9 +79,7 @@ fn orchestrator_notifies_telemetry_hooks() {
   let handle = SerializerHandle::new(BincodeSerializer::new());
   registry.register_serializer(handle.clone()).expect("register handle");
   registry.bind_type::<Leaf, _>(&handle, Some("leaf".into()), decode_leaf).expect("bind leaf");
-  registry
-    .bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope)
-    .expect("bind env");
+  registry.bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope).expect("bind env");
   register_envelope_schema(&registry);
   let schema = registry.load_schema::<EnvelopeAggregate>().expect("schema");
   let hashes = schema.fields().iter().map(|node| node.path_hash()).collect::<Vec<_>>();
@@ -93,17 +90,14 @@ fn orchestrator_notifies_telemetry_hooks() {
   let _ = orchestrator.serialize(&aggregate).expect("serialize");
 
   let events = telemetry.snapshot();
-  assert_eq!(
-    events,
-    vec![
-      TelemetryCall::AggregateStart,
-      TelemetryCall::FieldSuccess(hashes[0]),
-      TelemetryCall::FieldLatency(hashes[0], Duration::ZERO),
-      TelemetryCall::FieldSuccess(hashes[1]),
-      TelemetryCall::FieldLatency(hashes[1], Duration::ZERO),
-      TelemetryCall::AggregateFinish,
-    ]
-  );
+  assert_eq!(events, vec![
+    TelemetryCall::AggregateStart,
+    TelemetryCall::FieldSuccess(hashes[0]),
+    TelemetryCall::FieldLatency(hashes[0], Duration::ZERO),
+    TelemetryCall::FieldSuccess(hashes[1]),
+    TelemetryCall::FieldLatency(hashes[1], Duration::ZERO),
+    TelemetryCall::AggregateFinish,
+  ]);
 }
 
 #[test]
@@ -111,9 +105,7 @@ fn orchestrator_notifies_failure_telemetry() {
   let registry = ArcShared::new(SerializerRegistry::<NoStdToolbox>::new());
   let handle = SerializerHandle::new(BincodeSerializer::new());
   registry.register_serializer(handle.clone()).expect("register handle");
-  registry
-    .bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope)
-    .expect("bind env");
+  registry.bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope).expect("bind env");
   register_envelope_schema(&registry);
   let schema = registry.load_schema::<EnvelopeAggregate>().expect("schema");
   let hash = schema.fields()[0].path_hash();
@@ -129,15 +121,12 @@ fn orchestrator_notifies_failure_telemetry() {
   ));
 
   let events = telemetry.snapshot();
-  assert_eq!(
-    events,
-    vec![
-      TelemetryCall::AggregateStart,
-      TelemetryCall::FieldFailure(hash),
-      TelemetryCall::FieldLatency(hash, Duration::ZERO),
-      TelemetryCall::AggregateFinish,
-    ]
-  );
+  assert_eq!(events, vec![
+    TelemetryCall::AggregateStart,
+    TelemetryCall::FieldFailure(hash),
+    TelemetryCall::FieldLatency(hash, Duration::ZERO),
+    TelemetryCall::AggregateFinish,
+  ]);
 }
 
 #[test]
@@ -145,12 +134,11 @@ fn orchestrator_serializes_allowed_field_with_external_adapter() {
   let registry = ArcShared::new(SerializerRegistry::<NoStdToolbox>::new());
   let handle = SerializerHandle::new(BincodeSerializer::new());
   registry.register_serializer(handle.clone()).expect("register handle");
-  registry
-    .bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope)
-    .expect("bind env");
+  registry.bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope).expect("bind env");
   register_external_schema(&registry);
 
-  let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), ArcShared::new(NoopSerializationTelemetry::new()));
+  let orchestrator =
+    NestedSerializerOrchestrator::new(registry.clone(), ArcShared::new(NoopSerializationTelemetry::new()));
   let aggregate = EnvelopeAggregate { first: Leaf(11), second: Leaf(0) };
   let payload = orchestrator.serialize(&aggregate).expect("serialize");
 

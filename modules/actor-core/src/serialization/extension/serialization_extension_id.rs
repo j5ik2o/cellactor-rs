@@ -12,7 +12,7 @@ pub static SERIALIZATION_EXTENSION: SerializationExtensionId = SerializationExte
 impl<TB: RuntimeToolbox + 'static> ExtensionId<TB> for SerializationExtensionId {
   type Ext = Serialization<TB>;
 
-  fn create_extension(&self, _system: &ActorSystemGeneric<TB>) -> Self::Ext {
-    Serialization::new()
+  fn create_extension(&self, system: &ActorSystemGeneric<TB>) -> Self::Ext {
+    Serialization::new(system.event_stream())
   }
 }

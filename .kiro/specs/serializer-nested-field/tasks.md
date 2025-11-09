@@ -65,7 +65,7 @@ graph TD
   - 依存関係: タスク2.1 完了後に着手。
   - _Requirements: R1.AC6_
 
-- [ ] 3. Telemetry / EventStream 拡張
+- [x] 3. Telemetry / EventStream 拡張
   - Telemetry Service にレイテンシ計測・閾値判定・フォールバック通知・外部委譲統計・デバッグトレース・監視 API 通知の各経路を追加し、`EventStreamEvent::Serialization` を新設する。
   - FieldPathHash を使って機密情報を隠しつつ、DeadLetter や監視エンドポイントへ対象フィールドを追跡できるようにする。
   - 完了条件: TelemetryService の新イベントが EventStream/監視 API に流れ、閾値以下の処理ではイベントが抑制されるテストが追加される。

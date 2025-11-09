@@ -7,20 +7,10 @@ use cellactor_utils_core_rs::sync::ArcShared;
 use erased_serde::Serialize as ErasedSerialize;
 
 use super::{
-  AggregateAccessors,
-  AggregateSchema,
-  FieldEnvelopeBuilder,
-  FieldPayload,
-  FieldTraversalEngine,
-  FieldValueRef,
-  SerializerRegistry,
-  SerializedPayload,
-  SerializationError,
-  external_serializer_adapter::ExternalSerializerAdapter,
-  external_serializer_policy::ExternalSerializerPolicy,
-  field_node::FieldNode,
-  serialization_telemetry::SerializationTelemetry,
-  type_binding::TypeBinding,
+  AggregateAccessors, AggregateSchema, FieldEnvelopeBuilder, FieldPayload, FieldTraversalEngine, FieldValueRef,
+  SerializationError, SerializedPayload, SerializerRegistry, external_serializer_adapter::ExternalSerializerAdapter,
+  external_serializer_policy::ExternalSerializerPolicy, field_node::FieldNode,
+  serialization_telemetry::SerializationTelemetry, type_binding::TypeBinding,
 };
 use crate::RuntimeToolbox;
 
@@ -29,10 +19,10 @@ mod tests;
 
 /// Coordinates schema traversal and payload assembly for aggregates.
 pub(super) struct NestedSerializerOrchestrator<TB: RuntimeToolbox + 'static> {
-  registry: ArcShared<SerializerRegistry<TB>>,
+  registry:  ArcShared<SerializerRegistry<TB>>,
   telemetry: ArcShared<dyn SerializationTelemetry>,
-  policy:   ExternalSerializerPolicy<TB>,
-  adapter:  ExternalSerializerAdapter,
+  policy:    ExternalSerializerPolicy<TB>,
+  adapter:   ExternalSerializerAdapter,
 }
 
 impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
@@ -46,25 +36,24 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
     Self { registry, telemetry, policy, adapter }
   }
 
-  /// Serializes the provided value, falling back to direct bindings when no aggregate schema exists.
+  /// Serializes the provided value, falling back to direct bindings when no aggregate schema
+  /// exists.
   pub(super) fn serialize<T>(&self, value: &T) -> Result<SerializedPayload, SerializationError>
   where
-    T: ErasedSerialize + Any + Send + Sync + 'static,
-  {
+    T: ErasedSerialize + Any + Send + Sync + 'static, {
     match (
       self.registry.load_schema::<T>(),
       self.registry.load_accessors::<T>(),
       self.registry.find_binding_by_type::<T>(),
     ) {
-      (Ok(schema), Ok(accessors), Ok(binding)) => self.serialize_with_schema(value, &schema, &accessors, &binding),
-      _ => self.serialize_direct::<T>(value),
+      | (Ok(schema), Ok(accessors), Ok(binding)) => self.serialize_with_schema(value, &schema, &accessors, &binding),
+      | _ => self.serialize_direct::<T>(value),
     }
   }
 
   fn serialize_direct<T>(&self, value: &T) -> Result<SerializedPayload, SerializationError>
   where
-    T: ErasedSerialize + Send + Sync + 'static,
-  {
+    T: ErasedSerialize + Send + Sync + 'static, {
     let binding = self.registry.find_binding_by_type::<T>()?;
     let erased: &dyn ErasedSerialize = value;
     let bytes = binding.serializer().serialize_erased(erased)?;
@@ -89,16 +78,16 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
         .ok_or(SerializationError::InvalidAggregateSchema("field traversal index out of bounds"))?;
       let field_hash = node.path_hash();
       let field_value = match accessors.extract(index, value) {
-        Ok(field_value) => field_value,
-        Err(error) => {
+        | Ok(field_value) => field_value,
+        | Err(error) => {
           telemetry.record_failure(field_hash, &error);
           telemetry.record_latency(field_hash, Duration::ZERO);
           return Err(error);
         },
       };
       let payload = match self.serialize_field(node, field_value) {
-        Ok(payload) => payload,
-        Err(error) => {
+        | Ok(payload) => payload,
+        | Err(error) => {
           telemetry.record_failure(field_hash, &error);
           telemetry.record_latency(field_hash, Duration::ZERO);
           return Err(error);
@@ -129,15 +118,15 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
       Ok(FieldPayload::new(bytes, manifest, serializer_id, node.path_hash()))
     } else {
       match self.registry.find_binding_by_id(node.type_id(), node.type_name()) {
-        Ok(binding) => {
+        | Ok(binding) => {
           let bytes = binding.serializer().serialize_erased(field_value.as_erased())?;
           Ok(FieldPayload::new(bytes, binding.manifest().to_string(), binding.serializer_id(), node.path_hash()))
         },
-        Err(SerializationError::NoSerializerForType(_)) => {
+        | Err(SerializationError::NoSerializerForType(_)) => {
           self.policy.enforce(node)?;
           self.serialize_field_external(node, field_value)
         },
-        Err(other) => Err(other),
+        | Err(other) => Err(other),
       }
     }
   }
