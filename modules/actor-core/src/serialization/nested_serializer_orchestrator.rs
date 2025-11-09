@@ -16,6 +16,8 @@ use super::{
   SerializerRegistry,
   SerializedPayload,
   SerializationError,
+  external_serializer_adapter::ExternalSerializerAdapter,
+  external_serializer_policy::ExternalSerializerPolicy,
   field_node::FieldNode,
   serialization_telemetry::SerializationTelemetry,
   type_binding::TypeBinding,
@@ -29,6 +31,8 @@ mod tests;
 pub(super) struct NestedSerializerOrchestrator<TB: RuntimeToolbox + 'static> {
   registry: ArcShared<SerializerRegistry<TB>>,
   telemetry: ArcShared<dyn SerializationTelemetry>,
+  policy:   ExternalSerializerPolicy<TB>,
+  adapter:  ExternalSerializerAdapter,
 }
 
 impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
@@ -37,7 +41,9 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
     registry: ArcShared<SerializerRegistry<TB>>,
     telemetry: ArcShared<dyn SerializationTelemetry>,
   ) -> Self {
-    Self { registry, telemetry }
+    let policy = ExternalSerializerPolicy::new(registry.clone());
+    let adapter = ExternalSerializerAdapter::new();
+    Self { registry, telemetry, policy, adapter }
   }
 
   /// Serializes the provided value, falling back to direct bindings when no aggregate schema exists.
@@ -122,10 +128,26 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
       let bytes = nested.into_bytes();
       Ok(FieldPayload::new(bytes, manifest, serializer_id, node.path_hash()))
     } else {
-      let binding = self.registry.find_binding_by_id(node.type_id(), node.type_name())?;
-      let bytes = binding.serializer().serialize_erased(field_value.as_erased())?;
-      Ok(FieldPayload::new(bytes, binding.manifest().to_string(), binding.serializer_id(), node.path_hash()))
+      match self.registry.find_binding_by_id(node.type_id(), node.type_name()) {
+        Ok(binding) => {
+          let bytes = binding.serializer().serialize_erased(field_value.as_erased())?;
+          Ok(FieldPayload::new(bytes, binding.manifest().to_string(), binding.serializer_id(), node.path_hash()))
+        },
+        Err(SerializationError::NoSerializerForType(_)) => {
+          self.policy.enforce(node)?;
+          self.serialize_field_external(node, field_value)
+        },
+        Err(other) => Err(other),
+      }
     }
+  }
+
+  fn serialize_field_external(
+    &self,
+    node: &FieldNode,
+    field_value: FieldValueRef,
+  ) -> Result<FieldPayload, SerializationError> {
+    self.adapter.serialize(node, &field_value)
   }
 }
 

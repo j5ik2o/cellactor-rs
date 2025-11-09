@@ -122,7 +122,11 @@ fn orchestrator_notifies_failure_telemetry() {
   let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry.clone());
   let aggregate = EnvelopeAggregate { first: Leaf(1), second: Leaf(2) };
   let err = orchestrator.serialize(&aggregate).expect_err("should fail");
-  assert!(matches!(err, SerializationError::NoSerializerForType(_)));
+  assert!(matches!(
+    err,
+    SerializationError::SerializationFailed(message)
+      if message.contains("external serializer not allowed for field envelope.first")
+  ));
 
   let events = telemetry.snapshot();
   assert_eq!(
@@ -134,6 +138,30 @@ fn orchestrator_notifies_failure_telemetry() {
       TelemetryCall::AggregateFinish,
     ]
   );
+}
+
+#[test]
+fn orchestrator_serializes_allowed_field_with_external_adapter() {
+  let registry = ArcShared::new(SerializerRegistry::<NoStdToolbox>::new());
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register handle");
+  registry
+    .bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope)
+    .expect("bind env");
+  register_external_schema(&registry);
+
+  let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), ArcShared::new(NoopSerializationTelemetry::new()));
+  let aggregate = EnvelopeAggregate { first: Leaf(11), second: Leaf(0) };
+  let payload = orchestrator.serialize(&aggregate).expect("serialize");
+
+  let mut cursor = payload.bytes().as_ref();
+  assert_eq!(read_bytes(&mut cursor, 4).as_slice(), b"AGGR");
+  assert_eq!(read_u16(&mut cursor), 1);
+  let entry = read_entry(&mut cursor);
+  assert_eq!(entry.serializer_id, handle.identifier());
+  assert_eq!(entry.manifest, core::any::type_name::<Leaf>());
+  assert_eq!(decode_leaf(entry.bytes.as_slice()).expect("decode"), Leaf(11));
+  assert!(cursor.is_empty());
 }
 
 fn register_envelope_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox>>) {
@@ -157,6 +185,22 @@ fn register_envelope_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox
       |aggregate| &aggregate.second,
     )
     .expect("second");
+  registry.register_aggregate_schema(builder.finish().expect("schema")).expect("register schema");
+}
+
+fn register_external_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox>>) {
+  let mut builder = AggregateSchemaBuilder::<EnvelopeAggregate>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("external").expect("display"),
+  );
+  builder
+    .add_value_field::<Leaf, _>(
+      FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
+      FieldPathDisplay::from_str("external.first").expect("display"),
+      true,
+      |aggregate| &aggregate.first,
+    )
+    .expect("allow_external");
   registry.register_aggregate_schema(builder.finish().expect("schema")).expect("register schema");
 }
 

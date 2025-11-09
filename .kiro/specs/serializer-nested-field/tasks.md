@@ -51,14 +51,14 @@ graph TD
   - 依存関係: タスク1.1 完了後に着手。
   - _Requirements: R1.AC1, R1.AC2, R1.AC3, R1.AC5_
 
-- [ ] 2.1 Orchestrator と外部シリアライザポリシーの統合
+- [x] 2.1 Orchestrator と外部シリアライザポリシーの統合
   - 既存 `Serialization` 拡張に Orchestrator を統合し、バインディング欠落時のエラーを Telemetry/DeadLetter に伝播する。
   - `ExternalSerializerPolicy` を適用し、禁止フィールドでの外部呼び出しは即座に失敗・イベント発行する。
   - 完了条件: 禁止フィールドで `SerializationError::SerializationFailed` が返り、対応する Telemetry イベントが生成されることをテストで確認する。
   - 依存関係: タスク2 完了後に着手。
   - _Requirements: R1.AC4, R1.AC7_
 
-- [ ] 2.2 外部シリアライザ経路の実装
+- [x] 2.2 外部シリアライザ経路の実装
   - `ExternalSerializerAdapter` を実装し、`external_serializer_allowed` な末端のみ外部シリアライザ（serde など）を呼び出して `FieldPayload` を生成する。
   - 成功/失敗を TelemetryCounters へ反映し、親エンベロープのヘッダを保持したまま統合するフローを構築する。
   - 完了条件: 外部許可フィールドで serde 経由のシリアライズが成功し、禁止フィールドで即時失敗する統合テストが追加される。

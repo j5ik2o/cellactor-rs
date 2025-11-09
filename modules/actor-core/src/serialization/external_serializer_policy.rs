@@ -1,6 +1,11 @@
 //! Cached policy entries for external serializer checks.
 
-use super::{field_node::FieldNode, field_path_hash::FieldPathHash};
+use alloc::format;
+
+use cellactor_utils_core_rs::sync::ArcShared;
+
+use super::{field_node::FieldNode, field_path_hash::FieldPathHash, registry::SerializerRegistry, SerializationError};
+use crate::RuntimeToolbox;
 
 /// Policy entry describing whether a field may use external serialization.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -27,5 +32,30 @@ impl ExternalSerializerPolicyEntry {
   #[must_use]
   pub(super) const fn external_allowed(&self) -> bool {
     self.external_allowed
+  }
+}
+
+/// Enforces external serializer access rules for registered fields.
+#[derive(Clone)]
+pub(super) struct ExternalSerializerPolicy<TB: RuntimeToolbox + 'static> {
+  registry: ArcShared<SerializerRegistry<TB>>,
+}
+
+impl<TB: RuntimeToolbox + 'static> ExternalSerializerPolicy<TB> {
+  /// Creates a new policy view backed by the serializer registry.
+  #[must_use]
+  pub(super) fn new(registry: ArcShared<SerializerRegistry<TB>>) -> Self {
+    Self { registry }
+  }
+
+  /// Ensures the provided field may leverage external serializers.
+  pub(super) fn enforce(&self, field: &FieldNode) -> Result<(), SerializationError> {
+    match self.registry.field_policy(field.path_hash()) {
+      Some(true) => Ok(()),
+      _ => Err(SerializationError::SerializationFailed(format!(
+        "external serializer not allowed for field {}",
+        field.display().as_str()
+      ))),
+    }
   }
 }

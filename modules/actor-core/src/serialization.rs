@@ -20,6 +20,8 @@ mod error;
 mod extension;
 /// External serializer policy cache.
 mod external_serializer_policy;
+/// External serializer adapter for pure value fields.
+mod external_serializer_adapter;
 /// Field metadata types.
 mod field_node;
 mod field_options;
