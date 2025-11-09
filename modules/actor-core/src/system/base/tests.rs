@@ -11,7 +11,7 @@ use crate::{
   event_stream::{EventStreamEvent, EventStreamSubscriber, EventStreamSubscriptionGeneric, SerializationAuditEvent},
   lifecycle::LifecycleStage,
   messaging::SystemMessage,
-  monitoring::serialization_audit_monitor::SerializationAuditMonitor,
+  monitoring::SerializationAuditMonitor,
   props::{DispatcherConfig, Props},
   serialization::{
     AggregateSchemaBuilder, BincodeSerializer, FieldPath, FieldPathDisplay, FieldPathSegment, SERIALIZATION_EXTENSION,
@@ -19,7 +19,7 @@ use crate::{
   },
   spawn::SpawnError,
   system::system_state::SystemStateGeneric,
-  telemetry::serialization_audit_notifier::SerializationAuditNotifier,
+  telemetry::SerializationAuditNotifier,
 };
 
 struct TestActor;

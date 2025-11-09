@@ -82,3 +82,13 @@ Typed API は Untyped へ変換するヘルパー (`into_untyped`, `as_untyped`)
 - `ActorSystem::spawn_with_parent` は fire-and-forget で動作し、`SystemMessage::Create` の enqueue が成功した時点で `ChildRef` を返します。`pre_start` の結果は EventStream や Supervisor を通じて観測してください。
 - Restart 指示は `SystemMessage::Recreate` を経由して `post_stop` → インスタンス再生成 → `pre_start(LifecycleStage::Restarted)` の順序を保証し、送信に失敗した場合は Stop/Escalate へフォールバックします。
 - 子アクターの失敗は `SystemMessage::Failure` として親へ配送され、監督戦略・メトリクス・EventStream が同じ経路を共有します。
+
+## ネストシリアライズのサンプル
+
+`modules/actor-core/examples/serialization_nested_demo_no_std/main.rs` には以下を 1 本で試せるサンプルを用意しています。
+
+- `AggregateSchemaBuilder` と `NestedSerializerOrchestrator` によるネストフィールドのシリアライズ/デシリアライズ
+- `external_serializer_allowed` フラグを有効/無効で切り替えた際のフォールバック挙動
+- `TelemetryService` による成功/フォールバック/レイテンシイベントの EventStream 監視
+
+実行は `modules/actor-core` ディレクトリで `cargo run --example serialization_nested_demo_no_std` を呼び出してください。出力ログには manifest ごとのバイト長、フィールドハッシュ、レイテンシ µs、外部委譲の成功/失敗が含まれ、仕様 T4.3 の性能テストと合わせて挙動を確認できます。

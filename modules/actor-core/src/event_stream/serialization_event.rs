@@ -1,19 +1,9 @@
 //! Events emitted by serialization subsystems.
 
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 
+use super::serialization_audit_issue::SerializationAuditIssue;
 use crate::serialization::RegistryAuditReport;
-
-/// Issue captured during a serialization audit.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SerializationAuditIssue {
-  /// Dot-separated field path identifying the problematic field.
-  pub field_path: String,
-  /// Name of the field type missing a binding.
-  pub type_name:  &'static str,
-  /// Short description of the issue.
-  pub reason:     String,
-}
 
 /// Event summarising the result of a serialization schema audit.
 #[derive(Clone, Debug, Eq, PartialEq)]

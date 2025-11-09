@@ -21,14 +21,12 @@ use crate::{
   futures::ActorFuture,
   logging::LogLevel,
   messaging::{AnyMessageGeneric, SystemMessage},
-  monitoring::{
-    serialization_audit_monitor::SerializationAuditMonitor, serialization_runtime_monitor::SerializationRuntimeMonitor,
-  },
+  monitoring::{SerializationAuditMonitor, SerializationRuntimeMonitor},
   props::PropsGeneric,
   serialization::SERIALIZATION_EXTENSION,
   spawn::SpawnError,
   system::{RegisterExtraTopLevelError, system_state::SystemStateGeneric},
-  telemetry::serialization_audit_notifier::SerializationAuditNotifier,
+  telemetry::SerializationAuditNotifier,
 };
 
 const PARENT_MISSING: &str = "parent actor not found";

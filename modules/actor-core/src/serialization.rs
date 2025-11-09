@@ -36,12 +36,14 @@ mod field_path_hash;
 mod field_path_segment;
 mod field_payload;
 mod field_traversal_engine;
+mod field_traversal_plan;
 mod field_value_ref;
 /// Nested serializer orchestrator implementation.
 mod nested_serializer_orchestrator;
 /// Serializable payload container storing manifest metadata.
 mod payload;
 /// Marker trait for Pekko default serialization.
+mod pekko_assignment_metrics;
 mod pekko_serializable;
 /// Helpers for pure-value checks.
 mod pure_value;
@@ -81,11 +83,13 @@ pub use field_path_display::FieldPathDisplay;
 pub use field_path_hash::FieldPathHash;
 pub use field_path_segment::FieldPathSegment;
 pub use field_payload::FieldPayload;
-pub use field_traversal_engine::{FieldTraversalEngine, FieldTraversalPlan};
+pub use field_traversal_engine::FieldTraversalEngine;
+pub use field_traversal_plan::FieldTraversalPlan;
 pub use field_value_ref::FieldValueRef;
 pub use payload::SerializedPayload;
+pub use pekko_assignment_metrics::PekkoAssignmentMetrics;
 pub use pekko_serializable::PekkoSerializable;
-pub use registry::{PekkoAssignmentMetrics, SerializerRegistry};
+pub use registry::SerializerRegistry;
 pub use registry_audit::{RegistryAuditIssue, RegistryAuditReport};
 pub use serialization_telemetry::{NoopSerializationTelemetry, SerializationTelemetry};
 pub use serializer::{SerializerHandle, SerializerImpl};

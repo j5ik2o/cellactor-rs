@@ -7,6 +7,9 @@ use cellactor_utils_core_rs::sync::ArcShared;
 use super::{SerializationError, field_node::FieldNode, field_path_hash::FieldPathHash, registry::SerializerRegistry};
 use crate::RuntimeToolbox;
 
+#[cfg(test)]
+mod tests;
+
 /// Policy entry describing whether a field may use external serialization.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct ExternalSerializerPolicyEntry {
@@ -59,6 +62,3 @@ impl<TB: RuntimeToolbox + 'static> ExternalSerializerPolicy<TB> {
     }
   }
 }
-
-#[cfg(test)]
-mod tests;

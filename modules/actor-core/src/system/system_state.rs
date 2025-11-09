@@ -34,10 +34,7 @@ use crate::{
   spawn::{NameRegistry, NameRegistryError, SpawnError},
   supervision::SupervisorDirective,
   system::RegisterExtraTopLevelError,
-  telemetry::{
-    noop_serialization_audit_notifier::NoopSerializationAuditNotifier,
-    serialization_audit_notifier::SerializationAuditNotifier,
-  },
+  telemetry::{NoopSerializationAuditNotifier, SerializationAuditNotifier},
 };
 
 mod failure_outcome;

@@ -2,7 +2,8 @@
 
 extern crate alloc;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
+use core::any::Any;
 
 use bincode::config::{Config, standard};
 use cellactor_actor_core_rs::{
@@ -215,10 +216,19 @@ impl SerializerImpl for DemoSerializer {
 
   fn deserialize(
     &self,
-    _bytes: &[u8],
+    bytes: &[u8],
     manifest: &str,
   ) -> Result<alloc::boxed::Box<dyn core::any::Any + Send>, SerializationError> {
-    Err(SerializationError::UnknownManifest { serializer_id: self.identifier(), manifest: manifest.to_string() })
+    match manifest {
+      | "demo.customer" => decode_boxed::<Customer>(bytes),
+      | "demo.line" => decode_boxed::<OrderLine>(bytes),
+      | "demo.order" => decode_boxed::<PurchaseOrder>(bytes),
+      | "demo.external" => decode_boxed::<ExternalOrder>(bytes),
+      | _ => Err(SerializationError::UnknownManifest {
+        serializer_id: self.identifier(),
+        manifest:      manifest.to_string(),
+      }),
+    }
   }
 }
 
@@ -246,6 +256,20 @@ fn decode_external_order(bytes: &[u8]) -> Result<ExternalOrder, SerializationErr
     .map_err(|err| SerializationError::DeserializationFailed(err.to_string()))
 }
 
+fn decode_with<T>(bytes: &[u8]) -> Result<T, SerializationError>
+where
+  T: for<'de> Deserialize<'de>, {
+  bincode::serde::decode_from_slice(bytes, bincode_config())
+    .map(|(value, _)| value)
+    .map_err(|err| SerializationError::DeserializationFailed(err.to_string()))
+}
+
+fn decode_boxed<T>(bytes: &[u8]) -> Result<Box<dyn Any + Send>, SerializationError>
+where
+  T: for<'de> Deserialize<'de> + Any + Send + 'static, {
+  decode_with::<T>(bytes).map(|value| Box::new(value) as Box<dyn Any + Send>)
+}
+
 fn trigger_external_serializer(serialization: &ArcShared<Serialization<NoStdToolbox>>) {
   let order = ExternalOrder { payload: ExternalLeaf { code: 404 } };
   let payload = serialization.serialize(&order).expect("serialize external order");
@@ -256,6 +280,8 @@ fn bincode_config() -> impl Config {
   standard().with_fixed_int_encoding()
 }
 
+// TODO(serializer-nested-field#4.3-followup): FieldEnvelopeParser などの公開 API が整備されたら
+//           AGGR ヘッダ解析を差し替えて、この冗長な手動デコード処理を撤去する。
 fn decode_purchase_order(
   serialization: ArcShared<Serialization<NoStdToolbox>>,
   payload: &SerializedPayload,
@@ -293,24 +319,36 @@ fn decode_purchase_order(
 
     let child_payload = SerializedPayload::new(serializer_id, manifest.clone(), Bytes::from_vec(child_bytes));
     let value = serialization.deserialize_payload(&child_payload)?;
-    if manifest == "demo.customer" {
-      customer = Some(
-        value
-          .downcast::<Customer>()
-          .map_err(|_| SerializationError::DeserializationFailed("customer".into()))?
-          .as_ref()
-          .clone(),
-      );
-    } else if manifest == "demo.line" {
-      line = Some(
-        value
-          .downcast::<OrderLine>()
-          .map_err(|_| SerializationError::DeserializationFailed("line".into()))?
-          .as_ref()
-          .clone(),
-      );
-    } else {
-      println!("unknown field hash {} manifest {}", field_hash, manifest);
+    match manifest.as_str() {
+      | "demo.customer" => {
+        if customer.is_some() {
+          return Err(SerializationError::DeserializationFailed("duplicate customer field in aggregate".into()));
+        }
+        customer = Some(
+          value
+            .downcast::<Customer>()
+            .map_err(|_| SerializationError::DeserializationFailed("customer".into()))?
+            .as_ref()
+            .clone(),
+        );
+      },
+      | "demo.line" => {
+        if line.is_some() {
+          return Err(SerializationError::DeserializationFailed("duplicate line field in aggregate".into()));
+        }
+        line = Some(
+          value
+            .downcast::<OrderLine>()
+            .map_err(|_| SerializationError::DeserializationFailed("line".into()))?
+            .as_ref()
+            .clone(),
+        );
+      },
+      | other => {
+        return Err(SerializationError::DeserializationFailed(format!(
+          "unexpected field manifest {other} (hash={field_hash})",
+        )));
+      },
     }
   }
 

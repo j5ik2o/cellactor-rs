@@ -11,7 +11,7 @@ use crate::{
     EventStream, EventStreamEvent, EventStreamSubscriber, EventStreamSubscription, SerializationEventKind,
     SerializationFallbackReason,
   },
-  monitoring::serialization_runtime_monitor::SerializationRuntimeMonitor,
+  monitoring::SerializationRuntimeMonitor,
   serialization::{SerializationError, SerializationTelemetry, TelemetryConfig, TelemetryService},
   system::SystemStateGeneric,
 };

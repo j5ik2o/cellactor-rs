@@ -6,36 +6,11 @@ use heapless::Vec;
 
 use super::{
   aggregate_schema::AggregateSchema, constants::MAX_FIELDS_PER_AGGREGATE, error::SerializationError,
-  field_node::FieldNode, traversal_policy::TraversalPolicy,
+  field_node::FieldNode, field_traversal_plan::FieldTraversalPlan, traversal_policy::TraversalPolicy,
 };
 
 #[cfg(test)]
 mod tests;
-
-/// Immutable list of field indices describing traversal order.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FieldTraversalPlan {
-  order: Vec<usize, MAX_FIELDS_PER_AGGREGATE>,
-}
-
-impl FieldTraversalPlan {
-  /// Returns the number of entries in the plan.
-  #[must_use]
-  pub fn len(&self) -> usize {
-    self.order.len()
-  }
-
-  /// Indicates whether the plan contains no entries.
-  #[must_use]
-  pub fn is_empty(&self) -> bool {
-    self.order.is_empty()
-  }
-
-  /// Returns an iterator over field indices following the traversal order.
-  pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
-    self.order.iter().copied()
-  }
-}
 
 /// Computes traversal plans for aggregate schemas.
 pub struct FieldTraversalEngine;
@@ -52,7 +27,7 @@ impl FieldTraversalEngine {
     let fields = schema.fields();
     indices.as_mut_slice().sort_unstable_by(|lhs, rhs| compare(policy, &fields[*lhs], &fields[*rhs]));
 
-    Ok(FieldTraversalPlan { order: indices })
+    Ok(FieldTraversalPlan::new(indices))
   }
 }
 

@@ -22,6 +22,7 @@ use super::{
   error::SerializationError,
   external_serializer_policy::ExternalSerializerPolicyEntry,
   field_path_hash::FieldPathHash,
+  pekko_assignment_metrics::PekkoAssignmentMetrics,
   pekko_serializable::PekkoSerializable,
   registry_audit::{RegistryAuditIssue, RegistryAuditReport},
   serializer::SerializerHandle,
@@ -416,16 +417,8 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
   }
 }
 
-/// Snapshot of Pekko assignment counters for observability surfaces.
+/// Tracks DFS visitation for schema audit graph traversal.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct PekkoAssignmentMetrics {
-  /// Number of successful automatic assignments.
-  pub success_total: u64,
-  /// Number of failed assignments (e.g., manifest collisions).
-  pub failure_total: u64,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
 enum AuditVisitState {
   Visiting,
   Done,

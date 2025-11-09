@@ -1,9 +1,7 @@
 //! No-op telemetry handler used when no backend is configured.
 
-use crate::{
-  RuntimeToolbox, event_stream::SerializationAuditEvent,
-  telemetry::serialization_audit_notifier::SerializationAuditNotifier,
-};
+use super::serialization_audit_notifier::SerializationAuditNotifier;
+use crate::{RuntimeToolbox, event_stream::SerializationAuditEvent};
 
 /// Telemetry handler that discards all serialization audit events.
 pub struct NoopSerializationAuditNotifier;
