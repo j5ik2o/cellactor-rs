@@ -31,6 +31,12 @@ impl FieldPathDisplay {
     self.bytes.as_slice()
   }
 
+  /// Returns the stored length.
+  #[must_use]
+  pub fn len(&self) -> usize {
+    self.bytes.len()
+  }
+
   /// Returns the stored string slice.
   #[must_use]
   pub fn as_str(&self) -> &str {

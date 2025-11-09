@@ -22,13 +22,17 @@ use crate::{
   actor_prim::{ActorCellGeneric, ActorPath, Pid, actor_ref::ActorRefGeneric},
   dead_letter::{DeadLetterEntryGeneric, DeadLetterGeneric, DeadLetterReason},
   error::{ActorError, SendError},
-  event_stream::{EventStreamEvent, EventStreamGeneric},
+  event_stream::{EventStreamEvent, EventStreamGeneric, SerializationAuditEvent},
   futures::ActorFuture,
   logging::{LogEvent, LogLevel},
   messaging::{AnyMessageGeneric, FailurePayload, SystemMessage},
   spawn::{NameRegistry, NameRegistryError, SpawnError},
   supervision::SupervisorDirective,
   system::RegisterExtraTopLevelError,
+  telemetry::{
+    noop_serialization_audit_notifier::NoopSerializationAuditNotifier,
+    serialization_audit_notifier::SerializationAuditNotifier,
+  },
 };
 
 mod failure_outcome;
@@ -42,29 +46,32 @@ const RESERVED_TOP_LEVEL: [&str; 4] = ["user", "system", "temp", "deadLetters"];
 
 /// Captures global actor system state.
 pub struct SystemStateGeneric<TB: RuntimeToolbox + 'static> {
-  next_pid:               AtomicU64,
-  clock:                  AtomicU64,
-  cells:                  ToolboxMutex<HashMap<Pid, ArcShared<ActorCellGeneric<TB>>>, TB>,
-  registries:             ToolboxMutex<HashMap<Option<Pid>, NameRegistry>, TB>,
-  root_guardian:          ToolboxMutex<Option<ArcShared<ActorCellGeneric<TB>>>, TB>,
-  system_guardian:        ToolboxMutex<Option<ArcShared<ActorCellGeneric<TB>>>, TB>,
-  user_guardian:          ToolboxMutex<Option<ArcShared<ActorCellGeneric<TB>>>, TB>,
-  ask_futures:            ToolboxMutex<AskFutureVec<TB>, TB>,
-  termination:            ArcShared<ActorFuture<(), TB>>,
-  terminated:             AtomicBool,
-  terminating:            AtomicBool,
-  root_started:           AtomicBool,
-  event_stream:           ArcShared<EventStreamGeneric<TB>>,
-  dead_letter:            ArcShared<DeadLetterGeneric<TB>>,
-  extra_top_levels:       ToolboxMutex<HashMap<String, ActorRefGeneric<TB>>, TB>,
-  temp_actors:            ToolboxMutex<HashMap<String, ActorRefGeneric<TB>>, TB>,
-  temp_counter:           AtomicU64,
-  failure_total:          AtomicU64,
-  failure_restart_total:  AtomicU64,
-  failure_stop_total:     AtomicU64,
+  next_pid: AtomicU64,
+  clock: AtomicU64,
+  cells: ToolboxMutex<HashMap<Pid, ArcShared<ActorCellGeneric<TB>>>, TB>,
+  registries: ToolboxMutex<HashMap<Option<Pid>, NameRegistry>, TB>,
+  root_guardian: ToolboxMutex<Option<ArcShared<ActorCellGeneric<TB>>>, TB>,
+  system_guardian: ToolboxMutex<Option<ArcShared<ActorCellGeneric<TB>>>, TB>,
+  user_guardian: ToolboxMutex<Option<ArcShared<ActorCellGeneric<TB>>>, TB>,
+  ask_futures: ToolboxMutex<AskFutureVec<TB>, TB>,
+  termination: ArcShared<ActorFuture<(), TB>>,
+  terminated: AtomicBool,
+  terminating: AtomicBool,
+  root_started: AtomicBool,
+  event_stream: ArcShared<EventStreamGeneric<TB>>,
+  dead_letter: ArcShared<DeadLetterGeneric<TB>>,
+  extra_top_levels: ToolboxMutex<HashMap<String, ActorRefGeneric<TB>>, TB>,
+  temp_actors: ToolboxMutex<HashMap<String, ActorRefGeneric<TB>>, TB>,
+  temp_counter: AtomicU64,
+  failure_total: AtomicU64,
+  failure_restart_total: AtomicU64,
+  failure_stop_total: AtomicU64,
   failure_escalate_total: AtomicU64,
-  failure_inflight:       AtomicU64,
-  extensions:             ToolboxMutex<HashMap<TypeId, ArcShared<dyn Any + Send + Sync + 'static>>, TB>,
+  failure_inflight: AtomicU64,
+  extensions: ToolboxMutex<HashMap<TypeId, ArcShared<dyn Any + Send + Sync + 'static>>, TB>,
+  serialization_audit_enabled: AtomicBool,
+  last_serialization_audit: ToolboxMutex<Option<SerializationAuditEvent>, TB>,
+  audit_notifier: ToolboxMutex<ArcShared<dyn SerializationAuditNotifier<TB>>, TB>,
 }
 
 /// Type alias for [SystemStateGeneric] with the default [NoStdToolbox].
@@ -101,6 +108,11 @@ impl<TB: RuntimeToolbox + 'static> SystemStateGeneric<TB> {
       failure_escalate_total: AtomicU64::new(0),
       failure_inflight: AtomicU64::new(0),
       extensions: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      serialization_audit_enabled: AtomicBool::new(true),
+      last_serialization_audit: <TB::MutexFamily as SyncMutexFamily>::create(None),
+      audit_notifier: <TB::MutexFamily as SyncMutexFamily>::create(ArcShared::new(
+        NoopSerializationAuditNotifier::new(),
+      )),
     }
   }
 
@@ -347,6 +359,61 @@ impl<TB: RuntimeToolbox + 'static> SystemStateGeneric<TB> {
   /// Publishes an event to all event stream subscribers.
   pub fn publish_event(&self, event: &EventStreamEvent<TB>) {
     self.event_stream.publish(event);
+  }
+
+  /// Indicates whether serialization audits are enabled.
+  #[must_use]
+  pub(crate) fn serialization_audit_enabled(&self) -> bool {
+    self.serialization_audit_enabled.load(Ordering::Acquire)
+  }
+
+  /// Enables or disables serialization audits.
+  pub(crate) fn set_serialization_audit_enabled(&self, enabled: bool) {
+    self.serialization_audit_enabled.store(enabled, Ordering::Release);
+    if !enabled {
+      *self.last_serialization_audit.lock() = None;
+    }
+  }
+
+  /// Installs a telemetry notifier that receives serialization audits.
+  pub(crate) fn set_serialization_audit_notifier(&self, notifier: ArcShared<dyn SerializationAuditNotifier<TB>>) {
+    *self.audit_notifier.lock() = notifier;
+  }
+
+  /// Publishes the latest serialization audit to all monitoring surfaces.
+  pub(crate) fn publish_serialization_audit(&self, event: &SerializationAuditEvent) {
+    self.event_stream.publish(&EventStreamEvent::SerializationAudit(event.clone()));
+    *self.last_serialization_audit.lock() = Some(event.clone());
+
+    if event.success() {
+      return;
+    }
+
+    let summary = event
+      .issues
+      .iter()
+      .take(3)
+      .map(|issue| format!("{} ({})", issue.field_path, issue.reason))
+      .collect::<Vec<_>>()
+      .join(", ");
+    let message = if summary.is_empty() {
+      "serialization audit reported failures".to_string()
+    } else {
+      format!("serialization audit reported failures: {summary}")
+    };
+    self.emit_log(LogLevel::Error, message, None);
+
+    let notifier = self.audit_notifier.lock().clone();
+    notifier.on_serialization_audit(event);
+
+    let payload = AnyMessageGeneric::new(event.clone());
+    self.record_dead_letter(payload, DeadLetterReason::ExplicitRouting, None);
+  }
+
+  /// Returns the last published serialization audit event, if any.
+  #[must_use]
+  pub(crate) fn last_serialization_audit(&self) -> Option<SerializationAuditEvent> {
+    self.last_serialization_audit.lock().clone()
   }
 
   /// Emits a log event via the event stream.

@@ -31,6 +31,8 @@ mod payload;
 mod pure_value;
 /// Serializer and manifest registries.
 mod registry;
+/// Registry audit reporting utilities.
+mod registry_audit;
 /// Object-safe serializer traits and handles.
 mod serializer;
 /// Traversal policy definitions.
@@ -53,5 +55,6 @@ pub use field_path_hash::FieldPathHash;
 pub use field_path_segment::FieldPathSegment;
 pub use payload::SerializedPayload;
 pub use registry::SerializerRegistry;
+pub use registry_audit::{RegistryAuditIssue, RegistryAuditReport};
 pub use serializer::{SerializerHandle, SerializerImpl};
 pub use traversal_policy::TraversalPolicy;

@@ -13,19 +13,25 @@ use crate::{
   actor_prim::{ActorCellGeneric, ChildRefGeneric, Pid, actor_ref::ActorRefGeneric},
   dead_letter::DeadLetterEntryGeneric,
   error::SendError,
-  event_stream::{EventStreamEvent, EventStreamGeneric, EventStreamSubscriber, EventStreamSubscriptionGeneric},
+  event_stream::{
+    EventStreamEvent, EventStreamGeneric, EventStreamSubscriber, EventStreamSubscriptionGeneric,
+    SerializationAuditEvent,
+  },
   extension::ExtensionId,
   futures::ActorFuture,
   logging::LogLevel,
   messaging::{AnyMessageGeneric, SystemMessage},
+  monitoring::serialization_audit_monitor::SerializationAuditMonitor,
   props::PropsGeneric,
   serialization::SERIALIZATION_EXTENSION,
   spawn::SpawnError,
   system::{RegisterExtraTopLevelError, system_state::SystemStateGeneric},
+  telemetry::serialization_audit_notifier::SerializationAuditNotifier,
 };
 
 const PARENT_MISSING: &str = "parent actor not found";
 const CREATE_SEND_FAILED: &str = "create system message delivery failed";
+const SERIALIZATION_AUDIT_FAILED: &str = "serialization schema audit failed";
 
 /// Core runtime structure that owns registry, guardians, and spawn logic.
 pub struct ActorSystemGeneric<TB: RuntimeToolbox + 'static> {
@@ -99,6 +105,34 @@ impl<TB: RuntimeToolbox + 'static> ActorSystemGeneric<TB> {
   #[must_use]
   pub fn event_stream(&self) -> ArcShared<EventStreamGeneric<TB>> {
     self.state.event_stream()
+  }
+
+  /// Enables or disables serialization audits before bootstrap finalizes.
+  pub fn set_serialization_audit_enabled(&self, enabled: bool) {
+    self.state.set_serialization_audit_enabled(enabled);
+  }
+
+  /// Installs a serialization audit telemetry notifier.
+  pub fn set_serialization_audit_notifier(&self, notifier: ArcShared<dyn SerializationAuditNotifier<TB>>) {
+    self.state.set_serialization_audit_notifier(notifier);
+  }
+
+  /// Returns whether serialization audits are currently enabled.
+  #[must_use]
+  pub fn serialization_audit_enabled(&self) -> bool {
+    self.state.serialization_audit_enabled()
+  }
+
+  /// Returns the most recent serialization audit report, if any.
+  #[must_use]
+  pub fn last_serialization_audit(&self) -> Option<SerializationAuditEvent> {
+    self.state.last_serialization_audit()
+  }
+
+  /// Provides a handle for monitoring serialization audit state.
+  #[must_use]
+  pub fn serialization_audit_monitor(&self) -> SerializationAuditMonitor<TB> {
+    SerializationAuditMonitor::new(self.state.clone())
   }
 
   /// Subscribes the provided observer to the event stream.
@@ -335,9 +369,18 @@ impl<TB: RuntimeToolbox + 'static> ActorSystemGeneric<TB> {
       self.state.set_system_guardian(cell);
     }
 
-    let _ = self.register_extension(&SERIALIZATION_EXTENSION);
+    let serialization = self.register_extension(&SERIALIZATION_EXTENSION);
 
     configure(self)?;
+
+    if self.state.serialization_audit_enabled() {
+      let audit_report = serialization.registry().audit();
+      let audit_event = SerializationAuditEvent::from(&audit_report);
+      self.state.publish_serialization_audit(&audit_event);
+      if !audit_event.success() {
+        return Err(SpawnError::invalid_props(SERIALIZATION_AUDIT_FAILED));
+      }
+    }
 
     if let Err(error) = self.perform_create_handshake(None, root_pid, &root_cell) {
       self.rollback_spawn(None, &root_cell, root_pid);

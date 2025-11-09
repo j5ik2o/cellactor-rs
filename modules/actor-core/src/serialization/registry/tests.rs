@@ -1,6 +1,9 @@
 use alloc::string::ToString;
+use core::any::TypeId;
 
-use super::SerializerRegistry;
+use cellactor_utils_core_rs::sync::ArcShared;
+
+use super::{super::type_binding::TypeBinding, SerializerRegistry};
 use crate::{
   NoStdToolbox,
   serialization::{
@@ -16,6 +19,20 @@ fn decode(bytes: &[u8]) -> Result<Message, SerializationError> {
   bincode::serde::decode_from_slice(bytes, bincode::config::standard().with_fixed_int_encoding())
     .map(|(value, _)| value)
     .map_err(|error| SerializationError::DeserializationFailed(error.to_string()))
+}
+
+fn decode_child_value(bytes: &[u8]) -> Result<Child, SerializationError> {
+  bincode::serde::decode_from_slice(bytes, bincode::config::standard().with_fixed_int_encoding())
+    .map(|(value, _)| value)
+    .map_err(|error| SerializationError::DeserializationFailed(error.to_string()))
+}
+
+fn decode_manifest_a(_bytes: &[u8]) -> Result<ManifestA, SerializationError> {
+  Ok(ManifestA)
+}
+
+fn decode_manifest_b(_bytes: &[u8]) -> Result<ManifestB, SerializationError> {
+  Ok(ManifestB)
 }
 
 #[test]
@@ -45,9 +62,21 @@ fn binds_and_recovers_types() {
 #[derive(Debug)]
 struct Parent;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[allow(dead_code)]
 struct Child(u32);
+
+#[derive(Debug)]
+struct CycleA;
+
+#[derive(Debug)]
+struct CycleB;
+
+#[derive(Debug)]
+struct ManifestA;
+
+#[derive(Debug)]
+struct ManifestB;
 
 #[test]
 fn registers_aggregate_schema_and_loads_it() {
@@ -82,6 +111,22 @@ fn rejects_external_serializer_for_non_pure_value() {
       FieldOptions::new(EnvelopeMode::PreserveOrder).with_external_serializer_allowed(true),
     )
     .expect_err("should reject non-pure value");
+  assert!(matches!(err, SerializationError::InvalidAggregateSchema(_)));
+}
+
+#[test]
+fn rejects_external_serializer_when_envelope_mode_not_supported() {
+  let mut builder = AggregateSchemaBuilder::<Parent>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("parent").expect("parent"),
+  );
+  let err = builder
+    .add_field::<Child>(
+      FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
+      FieldPathDisplay::from_str("parent.child").expect("display"),
+      FieldOptions::new(EnvelopeMode::Raw).with_external_serializer_allowed(true),
+    )
+    .expect_err("should reject raw envelope");
   assert!(matches!(err, SerializationError::InvalidAggregateSchema(_)));
 }
 
@@ -131,4 +176,111 @@ fn field_policy_lookup_succeeds() {
   let loaded = registry.load_schema::<Parent>().expect("load");
   let hash = loaded.fields().first().expect("field").path_hash();
   assert_eq!(registry.field_policy(hash), Some(true));
+}
+
+#[test]
+fn audit_reports_missing_serializer() {
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+  let mut builder = AggregateSchemaBuilder::<Parent>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("parent").expect("display"),
+  );
+  builder
+    .add_value_field::<Child>(
+      FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
+      FieldPathDisplay::from_str("parent.child").expect("display"),
+      false,
+    )
+    .expect("add child");
+  let schema = builder.finish().expect("schema");
+  registry.register_aggregate_schema(schema).expect("register schema");
+  let report = registry.audit();
+  assert!(!report.success());
+  assert_eq!(report.issues.len(), 1);
+  assert_eq!(report.issues[0].reason, "serializer not registered");
+}
+
+#[test]
+fn audit_succeeds_when_all_fields_are_bound() {
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register serializer");
+  registry.bind_type::<Child, _>(&handle, Some("child".into()), decode_child_value).expect("bind child");
+
+  let mut builder = AggregateSchemaBuilder::<Parent>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("parent").expect("display"),
+  );
+  builder
+    .add_value_field::<Child>(
+      FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
+      FieldPathDisplay::from_str("parent.child").expect("display"),
+      false,
+    )
+    .expect("add child");
+  let schema = builder.finish().expect("schema");
+  registry.register_aggregate_schema(schema).expect("register schema");
+
+  let report = registry.audit();
+  assert!(report.success());
+  assert_eq!(report.schemas_checked, 1);
+  assert!(report.issues.is_empty());
+}
+
+#[test]
+fn audit_detects_cycles_in_registered_schemas() {
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+
+  let mut builder_a = AggregateSchemaBuilder::<CycleA>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("cycle_a").expect("display"),
+  );
+  builder_a
+    .add_value_field::<CycleB>(
+      FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
+      FieldPathDisplay::from_str("cycle_a.next").expect("display"),
+      false,
+    )
+    .expect("add field");
+
+  let mut builder_b = AggregateSchemaBuilder::<CycleB>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("cycle_b").expect("display"),
+  );
+  builder_b
+    .add_value_field::<CycleA>(
+      FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
+      FieldPathDisplay::from_str("cycle_b.next").expect("display"),
+      false,
+    )
+    .expect("add field");
+
+  let _ = registry.register_aggregate_schema(builder_a.finish().expect("schema"));
+  let _ = registry.register_aggregate_schema(builder_b.finish().expect("schema"));
+
+  let report = registry.audit();
+  assert!(!report.success());
+  assert!(report.issues.iter().any(|issue| issue.reason.contains("cycle detected")));
+}
+
+#[test]
+fn audit_detects_manifest_collisions() {
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry
+    .bind_type::<ManifestA, _>(&handle, Some("shared-manifest".into()), decode_manifest_a)
+    .expect("bind manifest a");
+
+  let duplicate_binding = ArcShared::new(TypeBinding::new(
+    TypeId::of::<ManifestB>(),
+    "shared-manifest".into(),
+    handle.identifier(),
+    &handle,
+    decode_manifest_b,
+  ));
+  registry.type_bindings.lock().insert(TypeId::of::<ManifestB>(), duplicate_binding);
+
+  let report = registry.audit();
+  assert!(!report.success());
+  assert!(report.issues.iter().any(|issue| issue.reason.contains("manifest collision")));
 }

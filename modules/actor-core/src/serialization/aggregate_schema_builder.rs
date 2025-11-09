@@ -41,6 +41,12 @@ impl<T: Any + 'static> AggregateSchemaBuilder<T> {
     display: FieldPathDisplay,
     options: FieldOptions,
   ) -> Result<&mut Self, SerializationError> {
+    if display.len() > super::constants::MAX_FIELD_PATH_BYTES {
+      return Err(SerializationError::InvalidAggregateSchema("field path display exceeds maximum length"));
+    }
+    if options.external_serializer_allowed() && options.envelope_mode() != EnvelopeMode::PreserveOrder {
+      return Err(SerializationError::InvalidAggregateSchema("external serializer requires preserve-order envelope"));
+    }
     if options.external_serializer_allowed() && !is_pure_value::<F>() {
       return Err(SerializationError::InvalidAggregateSchema("external serializer requires pure value type"));
     }

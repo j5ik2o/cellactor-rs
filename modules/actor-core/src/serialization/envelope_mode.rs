@@ -5,4 +5,6 @@
 pub enum EnvelopeMode {
   /// Preserve Pekko-compatible ordering and headers.
   PreserveOrder,
+  /// Raw passthrough encoding (not supported for external serializers).
+  Raw,
 }

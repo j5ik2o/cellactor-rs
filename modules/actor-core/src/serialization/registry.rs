@@ -1,6 +1,10 @@
 //! Serializer registry.
 
-use alloc::string::{String, ToString};
+use alloc::{
+  format,
+  string::{String, ToString},
+  vec::Vec,
+};
 use core::any::{Any, TypeId};
 
 use cellactor_utils_core_rs::{
@@ -10,9 +14,14 @@ use cellactor_utils_core_rs::{
 use hashbrown::{HashMap, hash_map::Entry};
 
 use super::{
-  aggregate_schema::AggregateSchema, error::SerializationError,
-  external_serializer_policy::ExternalSerializerPolicyEntry, field_path_hash::FieldPathHash,
-  serializer::SerializerHandle, type_binding::TypeBinding,
+  aggregate_schema::AggregateSchema,
+  constants::MAX_FIELD_PATH_BYTES,
+  error::SerializationError,
+  external_serializer_policy::ExternalSerializerPolicyEntry,
+  field_path_hash::FieldPathHash,
+  registry_audit::{RegistryAuditIssue, RegistryAuditReport},
+  serializer::SerializerHandle,
+  type_binding::TypeBinding,
 };
 use crate::{RuntimeToolbox, ToolboxMutex};
 
@@ -166,6 +175,127 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
     self.field_policies.lock().get(&hash).map(|entry| entry.external_allowed())
   }
 
+  /// Runs an audit across all registered schemas and reports structural issues.
+  pub fn audit(&self) -> RegistryAuditReport {
+    let schemas_guard = self.aggregate_schemas.lock();
+    let type_bindings_guard = self.type_bindings.lock();
+    let mut issues = Vec::new();
+
+    Self::detect_schema_field_issues(&schemas_guard, &type_bindings_guard, &mut issues);
+    Self::detect_schema_cycles(&schemas_guard, &mut issues);
+    Self::detect_manifest_collisions(&type_bindings_guard, &mut issues);
+
+    RegistryAuditReport::new(schemas_guard.len(), issues)
+  }
+
+  fn detect_schema_field_issues(
+    schemas: &HashMap<TypeId, ArcShared<AggregateSchema>>,
+    bindings: &HashMap<TypeId, ArcShared<TypeBinding>>,
+    issues: &mut Vec<RegistryAuditIssue>,
+  ) {
+    for schema in schemas.values() {
+      Self::check_display_length(schema.root_display().as_str(), schema.root_type_name(), issues);
+      for field in schema.fields() {
+        Self::check_display_length(field.display().as_str(), field.type_name(), issues);
+        if !field.external_serializer_allowed() && !bindings.contains_key(&field.type_id()) {
+          issues.push(RegistryAuditIssue {
+            field_path: field.display().as_str().to_string(),
+            type_name:  field.type_name(),
+            reason:     "serializer not registered".to_string(),
+          });
+        }
+      }
+    }
+  }
+
+  fn detect_manifest_collisions(
+    bindings: &HashMap<TypeId, ArcShared<TypeBinding>>,
+    issues: &mut Vec<RegistryAuditIssue>,
+  ) {
+    let mut manifest_index: HashMap<ManifestKey, &'static str> = HashMap::new();
+    for binding in bindings.values() {
+      let key = ManifestKey::new(binding.serializer_id(), binding.manifest().to_string());
+      if let Some(existing) = manifest_index.insert(key.clone(), binding.type_name()) {
+        issues.push(RegistryAuditIssue {
+          field_path: format!("serializer={} manifest={}", key.serializer_id(), key.manifest()),
+          type_name:  binding.type_name(),
+          reason:     format!("manifest collision with {}", existing),
+        });
+      }
+    }
+  }
+
+  fn detect_schema_cycles(schemas: &HashMap<TypeId, ArcShared<AggregateSchema>>, issues: &mut Vec<RegistryAuditIssue>) {
+    let mut adjacency: HashMap<TypeId, Vec<(TypeId, String)>> = HashMap::new();
+    for (type_id, schema) in schemas.iter() {
+      let entry = adjacency.entry(*type_id).or_insert_with(Vec::new);
+      for field in schema.fields() {
+        if schemas.contains_key(&field.type_id()) {
+          entry.push((field.type_id(), field.display().as_str().to_string()));
+        }
+      }
+    }
+
+    let mut visit_state: HashMap<TypeId, AuditVisitState> = HashMap::new();
+    let mut path: Vec<(TypeId, Option<String>)> = Vec::new();
+
+    for type_id in adjacency.keys().copied() {
+      if visit_state.get(&type_id).is_none() {
+        path.push((type_id, None));
+        Self::explore_cycles(type_id, &adjacency, &mut visit_state, &mut path, schemas, issues);
+        path.pop();
+      }
+    }
+  }
+
+  fn explore_cycles(
+    current: TypeId,
+    adjacency: &HashMap<TypeId, Vec<(TypeId, String)>>,
+    visit_state: &mut HashMap<TypeId, AuditVisitState>,
+    path: &mut Vec<(TypeId, Option<String>)>,
+    schemas: &HashMap<TypeId, ArcShared<AggregateSchema>>,
+    issues: &mut Vec<RegistryAuditIssue>,
+  ) {
+    visit_state.insert(current, AuditVisitState::Visiting);
+    if let Some(edges) = adjacency.get(&current) {
+      for (next, display) in edges {
+        match visit_state.get(next) {
+          | Some(AuditVisitState::Visiting) => {
+            let mut segments = Vec::new();
+            if let Some(position) = path.iter().position(|entry| entry.0 == *next) {
+              for entry in path.iter().skip(position + 1) {
+                if let Some(via) = &entry.1 {
+                  segments.push(via.clone());
+                }
+              }
+            }
+            segments.push(display.clone());
+            let field_path = segments.join(" -> ");
+            let type_name = schemas.get(next).map(|schema| schema.root_type_name()).unwrap_or("unknown");
+            issues.push(RegistryAuditIssue { field_path, type_name, reason: "cycle detected".to_string() });
+          },
+          | Some(AuditVisitState::Done) => continue,
+          | None => {
+            path.push((*next, Some(display.clone())));
+            Self::explore_cycles(*next, adjacency, visit_state, path, schemas, issues);
+            path.pop();
+          },
+        }
+      }
+    }
+    visit_state.insert(current, AuditVisitState::Done);
+  }
+
+  fn check_display_length(path: &str, type_name: &'static str, issues: &mut Vec<RegistryAuditIssue>) {
+    if path.as_bytes().len() > MAX_FIELD_PATH_BYTES {
+      issues.push(RegistryAuditIssue {
+        field_path: path.to_string(),
+        type_name,
+        reason: "FieldPathDisplay exceeds maximum length".to_string(),
+      });
+    }
+  }
+
   /// Registers an aggregate schema for later lookups.
   pub fn register_aggregate_schema(&self, schema: AggregateSchema) -> Result<(), SerializationError> {
     let type_id = schema.root_type();
@@ -199,6 +329,12 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
   }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum AuditVisitState {
+  Visiting,
+  Done,
+}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct ManifestKey {
   serializer_id: u32,
@@ -206,7 +342,15 @@ struct ManifestKey {
 }
 
 impl ManifestKey {
-  const fn new(serializer_id: u32, manifest: String) -> Self {
+  fn new(serializer_id: u32, manifest: String) -> Self {
     Self { serializer_id, manifest }
+  }
+
+  const fn serializer_id(&self) -> u32 {
+    self.serializer_id
+  }
+
+  fn manifest(&self) -> &str {
+    &self.manifest
   }
 }

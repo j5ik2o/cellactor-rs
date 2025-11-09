@@ -18,6 +18,7 @@ pub(super) type BoxedDeserializer =
 pub(super) struct TypeBinding {
   #[allow(dead_code)]
   type_id:           TypeId,
+  type_name:         &'static str,
   manifest:          String,
   serializer_id:     u32,
   serializer:        SerializerHandle,
@@ -37,7 +38,14 @@ impl TypeBinding {
     F: Fn(&[u8]) -> Result<T, SerializationError> + Send + Sync + 'static, {
     let deserialize_boxed: BoxedDeserializer =
       ArcShared::new(move |bytes| deserializer(bytes).map(|value| Box::new(value) as Box<dyn Any + Send>));
-    Self { type_id, manifest, serializer_id, serializer: serializer.clone(), deserialize_boxed }
+    Self {
+      type_id,
+      type_name: core::any::type_name::<T>(),
+      manifest,
+      serializer_id,
+      serializer: serializer.clone(),
+      deserialize_boxed,
+    }
   }
 
   /// Returns the stored manifest string.
@@ -57,6 +65,12 @@ impl TypeBinding {
   #[allow(dead_code)]
   pub(super) const fn type_id(&self) -> TypeId {
     self.type_id
+  }
+
+  /// Returns the Rust type name bound to the serializer.
+  #[must_use]
+  pub(super) const fn type_name(&self) -> &'static str {
+    self.type_name
   }
 
   /// Returns the serializer handle.

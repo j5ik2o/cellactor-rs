@@ -29,7 +29,7 @@ graph TD
   - 完了条件: Schema 登録 API と Policy 判定 API に対するユニットテストが追加され、CI で clippy/fmt/テストが合格する。
   - _Requirements: R2.AC1, R2.AC3_
 
-- [ ] 1.1 起動時検証と監査イベントの実装
+- [x] 1.1 起動時検証と監査イベントの実装
   - ActorSystem ブートストラップ時に全 `AggregateSchema` を走査し、循環・欠落・manifest 衝突・`FieldPathDisplay` 上限超過を検出して起動を停止するフローを追加する。
   - 監査フラグが有効なときに EventStream/Telemetry/DeadLetter/監視 API へ検証レポートを発行し、失敗経路を観測できるようにする。
   - 完了条件: 起動時検証をカバーする統合テストが追加され、エラー時のイベント内容がアサートされる。

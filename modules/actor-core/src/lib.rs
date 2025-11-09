@@ -74,11 +74,13 @@ pub mod lifecycle;
 pub mod logging;
 pub mod mailbox;
 pub mod messaging;
+pub mod monitoring;
 pub mod props;
 pub mod serialization;
 pub mod spawn;
 pub mod supervision;
 pub mod system;
+pub mod telemetry;
 pub mod typed;
 
 pub use extension::{Extension, ExtensionId};
