@@ -19,6 +19,7 @@ use super::{
   error::SerializationError,
   external_serializer_policy::ExternalSerializerPolicyEntry,
   field_path_hash::FieldPathHash,
+  pekko_serializable::PekkoSerializable,
   registry_audit::{RegistryAuditIssue, RegistryAuditReport},
   serializer::SerializerHandle,
   type_binding::TypeBinding,
@@ -167,6 +168,22 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
   where
     T: Any + 'static, {
     self.type_bindings.lock().contains_key(&TypeId::of::<T>())
+  }
+
+  /// Ensures that a Pekko-compatible type is bound to its default serializer.
+  pub fn assign_default_serializer<T>(&self) -> Result<(), SerializationError>
+  where
+    T: PekkoSerializable, {
+    if self.has_binding_for::<T>() {
+      return Ok(());
+    }
+
+    let serializer_id = T::pekko_serializer_id();
+    let serializer = self.find_serializer_by_id(serializer_id)?;
+    let manifest_value =
+      T::pekko_manifest().map(|value| value.to_string()).unwrap_or_else(|| core::any::type_name::<T>().to_string());
+
+    self.bind_type::<T, _>(&serializer, Some(manifest_value), T::pekko_decode)
   }
 
   /// Returns whether an external serializer is allowed for the provided path, if known.

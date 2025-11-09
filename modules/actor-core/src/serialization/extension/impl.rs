@@ -11,7 +11,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use super::super::{
   bincode_serializer::BincodeSerializer, error::SerializationError, payload::SerializedPayload,
-  registry::SerializerRegistry, serializer::SerializerHandle,
+  pekko_serializable::PekkoSerializable, registry::SerializerRegistry, serializer::SerializerHandle,
 };
 use crate::{RuntimeToolbox, extension::Extension};
 
@@ -83,6 +83,13 @@ impl<TB: RuntimeToolbox + 'static> Serialization<TB> {
   #[must_use]
   pub fn registry(&self) -> ArcShared<SerializerRegistry<TB>> {
     self.registry.clone()
+  }
+
+  /// Registers the default serializer/manifest pair for a Pekko-compatible type.
+  pub fn register_pekko_serializable<T>(&self) -> Result<(), SerializationError>
+  where
+    T: PekkoSerializable, {
+    self.registry.assign_default_serializer::<T>()
   }
 
   /// Deserializes an opaque payload into a boxed object.

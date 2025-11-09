@@ -8,7 +8,7 @@ use crate::{
   NoStdToolbox,
   serialization::{
     AggregateSchemaBuilder, BincodeSerializer, EnvelopeMode, FieldOptions, FieldPath, FieldPathDisplay,
-    FieldPathSegment, TraversalPolicy, error::SerializationError, serializer::SerializerHandle,
+    FieldPathSegment, PekkoSerializable, TraversalPolicy, error::SerializationError, serializer::SerializerHandle,
   },
 };
 
@@ -77,6 +77,29 @@ struct ManifestA;
 
 #[derive(Debug)]
 struct ManifestB;
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+struct AutoType(u32);
+
+impl PekkoSerializable for AutoType {}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+struct CustomManifestType(u32);
+
+impl PekkoSerializable for CustomManifestType {
+  fn pekko_manifest() -> Option<&'static str> {
+    Some("pekko.custom")
+  }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+struct DuplicateManifestType(u32);
+
+impl PekkoSerializable for DuplicateManifestType {
+  fn pekko_manifest() -> Option<&'static str> {
+    Some("pekko.custom")
+  }
+}
 
 #[test]
 fn registers_aggregate_schema_and_loads_it() {
@@ -283,4 +306,44 @@ fn audit_detects_manifest_collisions() {
   let report = registry.audit();
   assert!(!report.success());
   assert!(report.issues.iter().any(|issue| issue.reason.contains("manifest collision")));
+}
+
+#[test]
+fn assign_default_serializer_for_pekko_serializable() {
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register serializer");
+
+  registry.assign_default_serializer::<AutoType>().expect("assign default");
+  registry.assign_default_serializer::<AutoType>().expect("idempotent assign");
+
+  assert!(registry.has_binding_for::<AutoType>());
+  let binding =
+    registry.find_binding_by_manifest(handle.identifier(), core::any::type_name::<AutoType>()).expect("binding");
+  let sample = AutoType(99);
+  let erased: &dyn erased_serde::Serialize = &sample;
+  let bytes = handle.serialize_erased(erased).expect("serialize");
+  let recovered: AutoType = binding.deserialize_as(bytes.as_ref()).expect("deserialize");
+  assert_eq!(recovered, sample);
+}
+
+#[test]
+fn assign_default_serializer_respects_manifest_override() {
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register serializer");
+
+  registry.assign_default_serializer::<CustomManifestType>().expect("assign default");
+  assert!(registry.find_binding_by_manifest(handle.identifier(), "pekko.custom").is_ok());
+}
+
+#[test]
+fn assign_default_serializer_detects_manifest_collision() {
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register serializer");
+
+  registry.assign_default_serializer::<CustomManifestType>().expect("first assign");
+  let error = registry.assign_default_serializer::<DuplicateManifestType>().expect_err("collision should fail");
+  assert!(matches!(error, SerializationError::InvalidManifest(manifest) if manifest == "pekko.custom"));
 }
