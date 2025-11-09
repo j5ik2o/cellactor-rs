@@ -108,7 +108,7 @@ graph TD
   - Bootstrap 失敗シナリオ（循環、欠落、禁止外部委譲）が Telemetry/監視 API に流れることを確認し、外部委譲許可シナリオで成功イベントが増えることを検証する。
   - _Requirements: R1.AC4-R1.AC7, R2.AC2-R2.AC5, R3.AC2-R3.AC5_
 
-- [ ] 4.3 パフォーマンスと安定性テスト
+- [x] 4.3 パフォーマンスと安定性テスト
   - 深さ 16/32 の集約を対象にシリアライズ時間を計測し、`latency_threshold_us` 設定と Telemetry メトリクスが期待値を超えないことを検証する。
   - 1 秒あたり 10k メッセージ相当の負荷で Telemetry カウンタとヒストグラムが飽和しないこと、`FieldPathDisplay` が上限を超えた場合に登録エラーが返ることを確認する。
   - _Requirements: R3.AC1, R3.AC3, R3.AC6_

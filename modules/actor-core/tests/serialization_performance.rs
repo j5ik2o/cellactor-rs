@@ -3,7 +3,8 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use bincode::config::{standard, Config};
+
+use bincode::config::{Config, standard};
 use cellactor_actor_core_rs::{
   NoStdToolbox,
   actor_prim::{Actor, ActorContextGeneric},
@@ -12,8 +13,8 @@ use cellactor_actor_core_rs::{
   messaging::AnyMessageView,
   props::Props,
   serialization::{
-    AggregateSchemaBuilder, FieldPath, FieldPathDisplay, FieldPathSegment, Serialization, SerializationError,
-    SerializerHandle, SerializerImpl, SerializerRegistry, TraversalPolicy, SERIALIZATION_EXTENSION,
+    AggregateSchemaBuilder, FieldPath, FieldPathDisplay, FieldPathSegment, SERIALIZATION_EXTENSION, Serialization,
+    SerializationError, SerializerHandle, SerializerImpl, SerializerRegistry, TraversalPolicy,
   },
   system::ActorSystem,
 };
@@ -43,8 +44,10 @@ fn deep_schema_serialization_stays_within_latency_threshold() {
   let events = fixture.events();
   let latency_events = events
     .iter()
-    .filter(|event| matches!(event, EventStreamEvent::Serialization(runtime)
-      if matches!(runtime.kind(), SerializationEventKind::Latency(_))))
+    .filter(|event| {
+      matches!(event, EventStreamEvent::Serialization(runtime)
+      if matches!(runtime.kind(), SerializationEventKind::Latency(_)))
+    })
     .count();
   assert_eq!(latency_events, 0, "unexpected latency events detected");
 }
@@ -137,14 +140,23 @@ impl Actor for PerfGuardian {
   }
 }
 
-#[derive(Default)]
 struct EventCollector {
   events: NoStdMutex<Vec<EventStreamEvent<NoStdToolbox>>>,
 }
 
 impl EventCollector {
+  fn new() -> Self {
+    Self { events: NoStdMutex::new(Vec::new()) }
+  }
+
   fn events(&self) -> Vec<EventStreamEvent<NoStdToolbox>> {
     self.events.lock().clone()
+  }
+}
+
+impl Default for EventCollector {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
@@ -165,13 +177,9 @@ fn bind_type<T>(
   handle: &SerializerHandle,
   manifest: &str,
   decoder: fn(&[u8]) -> Result<T, SerializationError>,
-)
-where
-  T: Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static,
-{
-  registry
-    .bind_type::<T, _>(handle, Some(manifest.to_string()), decoder)
-    .expect("bind type");
+) where
+  T: Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static, {
+  registry.bind_type::<T, _>(handle, Some(manifest.to_string()), decoder).expect("bind type");
 }
 
 fn install_deep_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox>>, depth: usize) {
@@ -219,7 +227,10 @@ impl SerializerImpl for PerfSerializer {
     PERF_SERIALIZER_ID
   }
 
-  fn serialize_erased(&self, value: &dyn ErasedSerialize) -> Result<cellactor_actor_core_rs::serialization::Bytes, SerializationError> {
+  fn serialize_erased(
+    &self,
+    value: &dyn ErasedSerialize,
+  ) -> Result<cellactor_actor_core_rs::serialization::Bytes, SerializationError> {
     bincode::serde::encode_to_vec(value, bincode_config())
       .map(cellactor_actor_core_rs::serialization::Bytes::from_vec)
       .map_err(|error| SerializationError::SerializationFailed(error.to_string()))
