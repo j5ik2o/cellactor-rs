@@ -1,13 +1,20 @@
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+  string::{String, ToString},
+  vec,
+  vec::Vec,
+};
+use core::time::Duration;
 
 use cellactor_utils_core_rs::sync::ArcShared;
+use spin::Mutex;
 
 use super::NestedSerializerOrchestrator;
 use crate::{
   NoStdToolbox,
   serialization::{
-    AggregateSchemaBuilder, BincodeSerializer, FieldPath, FieldPathDisplay, FieldPathSegment, SerializerHandle,
-    SerializerRegistry, TraversalPolicy, SerializationError,
+    AggregateSchemaBuilder, BincodeSerializer, FieldPath, FieldPathDisplay, FieldPathHash, FieldPathSegment, SerializerHandle,
+    SerializerRegistry, TraversalPolicy, SerializationError, SerializationTelemetry,
+    NoopSerializationTelemetry,
   },
 };
 
@@ -42,6 +49,94 @@ fn orchestrator_serializes_aggregate_as_field_envelope() {
     .bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope)
     .expect("bind env");
 
+  register_envelope_schema(&registry);
+
+  let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), ArcShared::new(NoopSerializationTelemetry::new()));
+  let aggregate = EnvelopeAggregate { first: Leaf(7), second: Leaf(9) };
+  let payload = orchestrator.serialize(&aggregate).expect("serialize");
+
+  assert_eq!(payload.serializer_id(), handle.identifier());
+  assert_eq!(payload.manifest(), "envelope");
+
+  let mut cursor = payload.bytes().as_ref();
+  assert_eq!(read_bytes(&mut cursor, 4).as_slice(), b"AGGR");
+  let count = read_u16(&mut cursor);
+  assert_eq!(count, 2);
+
+  let first = read_entry(&mut cursor);
+  assert_eq!(first.serializer_id, handle.identifier());
+  assert_eq!(first.manifest, "leaf");
+  assert_eq!(decode_leaf(first.bytes.as_slice()).expect("decode"), Leaf(7));
+
+  let second = read_entry(&mut cursor);
+  assert_eq!(second.serializer_id, handle.identifier());
+  assert_eq!(second.manifest, "leaf");
+  assert_eq!(decode_leaf(second.bytes.as_slice()).expect("decode"), Leaf(9));
+}
+
+#[test]
+fn orchestrator_notifies_telemetry_hooks() {
+  let registry = ArcShared::new(SerializerRegistry::<NoStdToolbox>::new());
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register handle");
+  registry.bind_type::<Leaf, _>(&handle, Some("leaf".into()), decode_leaf).expect("bind leaf");
+  registry
+    .bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope)
+    .expect("bind env");
+  register_envelope_schema(&registry);
+  let schema = registry.load_schema::<EnvelopeAggregate>().expect("schema");
+  let hashes = schema.fields().iter().map(|node| node.path_hash()).collect::<Vec<_>>();
+
+  let telemetry = ArcShared::new(TelemetryProbe::new());
+  let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry.clone());
+  let aggregate = EnvelopeAggregate { first: Leaf(1), second: Leaf(2) };
+  let _ = orchestrator.serialize(&aggregate).expect("serialize");
+
+  let events = telemetry.snapshot();
+  assert_eq!(
+    events,
+    vec![
+      TelemetryCall::AggregateStart,
+      TelemetryCall::FieldSuccess(hashes[0]),
+      TelemetryCall::FieldLatency(hashes[0], Duration::ZERO),
+      TelemetryCall::FieldSuccess(hashes[1]),
+      TelemetryCall::FieldLatency(hashes[1], Duration::ZERO),
+      TelemetryCall::AggregateFinish,
+    ]
+  );
+}
+
+#[test]
+fn orchestrator_notifies_failure_telemetry() {
+  let registry = ArcShared::new(SerializerRegistry::<NoStdToolbox>::new());
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register handle");
+  registry
+    .bind_type::<EnvelopeAggregate, _>(&handle, Some("envelope".into()), decode_envelope)
+    .expect("bind env");
+  register_envelope_schema(&registry);
+  let schema = registry.load_schema::<EnvelopeAggregate>().expect("schema");
+  let hash = schema.fields()[0].path_hash();
+
+  let telemetry = ArcShared::new(TelemetryProbe::new());
+  let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry.clone());
+  let aggregate = EnvelopeAggregate { first: Leaf(1), second: Leaf(2) };
+  let err = orchestrator.serialize(&aggregate).expect_err("should fail");
+  assert!(matches!(err, SerializationError::NoSerializerForType(_)));
+
+  let events = telemetry.snapshot();
+  assert_eq!(
+    events,
+    vec![
+      TelemetryCall::AggregateStart,
+      TelemetryCall::FieldFailure(hash),
+      TelemetryCall::FieldLatency(hash, Duration::ZERO),
+      TelemetryCall::AggregateFinish,
+    ]
+  );
+}
+
+fn register_envelope_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox>>) {
   let mut builder = AggregateSchemaBuilder::<EnvelopeAggregate>::new(
     TraversalPolicy::DepthFirst,
     FieldPathDisplay::from_str("envelope").expect("display"),
@@ -63,28 +158,6 @@ fn orchestrator_serializes_aggregate_as_field_envelope() {
     )
     .expect("second");
   registry.register_aggregate_schema(builder.finish().expect("schema")).expect("register schema");
-
-  let orchestrator = NestedSerializerOrchestrator::new(registry.clone());
-  let aggregate = EnvelopeAggregate { first: Leaf(7), second: Leaf(9) };
-  let payload = orchestrator.serialize(&aggregate).expect("serialize");
-
-  assert_eq!(payload.serializer_id(), handle.identifier());
-  assert_eq!(payload.manifest(), "envelope");
-
-  let mut cursor = payload.bytes().as_ref();
-  assert_eq!(read_bytes(&mut cursor, 4).as_slice(), b"AGGR");
-  let count = read_u16(&mut cursor);
-  assert_eq!(count, 2);
-
-  let first = read_entry(&mut cursor);
-  assert_eq!(first.serializer_id, handle.identifier());
-  assert_eq!(first.manifest, "leaf");
-  assert_eq!(decode_leaf(first.bytes.as_slice()).expect("decode"), Leaf(7));
-
-  let second = read_entry(&mut cursor);
-  assert_eq!(second.serializer_id, handle.identifier());
-  assert_eq!(second.manifest, "leaf");
-  assert_eq!(decode_leaf(second.bytes.as_slice()).expect("decode"), Leaf(9));
 }
 
 fn read_entry(buffer: &mut &[u8]) -> ParsedEntry {
@@ -126,4 +199,54 @@ struct ParsedEntry {
   serializer_id: u32,
   manifest:      String,
   bytes:         Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum TelemetryCall {
+  AggregateStart,
+  AggregateFinish,
+  FieldSuccess(FieldPathHash),
+  FieldFailure(FieldPathHash),
+  FieldLatency(FieldPathHash, Duration),
+}
+
+#[derive(Default)]
+struct TelemetryProbe {
+  calls: Mutex<Vec<TelemetryCall>>,
+}
+
+impl TelemetryProbe {
+  fn new() -> Self {
+    Self { calls: Mutex::new(Vec::new()) }
+  }
+
+  fn snapshot(&self) -> Vec<TelemetryCall> {
+    self.calls.lock().clone()
+  }
+
+  fn push(&self, call: TelemetryCall) {
+    self.calls.lock().push(call);
+  }
+}
+
+impl SerializationTelemetry for TelemetryProbe {
+  fn on_aggregate_start(&self) {
+    self.push(TelemetryCall::AggregateStart);
+  }
+
+  fn on_aggregate_finish(&self) {
+    self.push(TelemetryCall::AggregateFinish);
+  }
+
+  fn record_latency(&self, field_path_hash: FieldPathHash, elapsed: Duration) {
+    self.push(TelemetryCall::FieldLatency(field_path_hash, elapsed));
+  }
+
+  fn record_success(&self, field_path_hash: FieldPathHash) {
+    self.push(TelemetryCall::FieldSuccess(field_path_hash));
+  }
+
+  fn record_failure(&self, field_path_hash: FieldPathHash, _error: &SerializationError) {
+    self.push(TelemetryCall::FieldFailure(field_path_hash));
+  }
 }

@@ -43,7 +43,7 @@ graph TD
   - 依存関係: タスク1 完了後に着手。
   - _Requirements: R2.AC6_
 
-- [ ] 2. ネストシリアライズ Orchestrator とトラバーサル
+- [x] 2. ネストシリアライズ Orchestrator とトラバーサル
   - `FieldTraversalEngine` を実装し、`AggregateSchema` から DFS/BFS 方針に沿ったプランを生成して各フィールドの `SerializerHandle` とメタデータを引き渡す。
   - `FieldEnvelopeBuilder` で親エンベロープを一元的に構築し、子フィールドが `SerializedPayload` を再生成できないよう型で抑制する。
   - Telemetry タイマー開始/終了ポイントを Orchestrator に追加し、各フィールド処理で `record_latency/record_success/record_failure` を呼び出す。

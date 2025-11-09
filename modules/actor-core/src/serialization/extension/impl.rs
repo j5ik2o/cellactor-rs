@@ -12,7 +12,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use super::super::{
   bincode_serializer::BincodeSerializer, error::SerializationError, nested_serializer_orchestrator::NestedSerializerOrchestrator,
   payload::SerializedPayload, pekko_serializable::PekkoSerializable, registry::SerializerRegistry,
-  serializer::SerializerHandle,
+  serialization_telemetry::{NoopSerializationTelemetry, SerializationTelemetry}, serializer::SerializerHandle,
 };
 use crate::{RuntimeToolbox, extension::Extension};
 
@@ -34,7 +34,8 @@ impl<TB: RuntimeToolbox + 'static> Serialization<TB> {
     if let Err(error) = registry.register_serializer(handle) {
       panic!("failed to register built-in serializer: {error}");
     }
-    let orchestrator = NestedSerializerOrchestrator::new(registry.clone());
+    let telemetry: ArcShared<dyn SerializationTelemetry> = ArcShared::new(NoopSerializationTelemetry::new());
+    let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry);
     Self { registry, orchestrator }
   }
 

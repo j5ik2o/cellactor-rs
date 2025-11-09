@@ -43,6 +43,8 @@ mod pure_value;
 mod registry;
 /// Registry audit reporting utilities.
 mod registry_audit;
+/// Telemetry hooks for nested serialization.
+mod serialization_telemetry;
 /// Object-safe serializer traits and handles.
 mod serializer;
 /// Traversal policy definitions.
@@ -77,5 +79,6 @@ pub use payload::SerializedPayload;
 pub use pekko_serializable::PekkoSerializable;
 pub use registry::{PekkoAssignmentMetrics, SerializerRegistry};
 pub use registry_audit::{RegistryAuditIssue, RegistryAuditReport};
+pub use serialization_telemetry::{NoopSerializationTelemetry, SerializationTelemetry};
 pub use serializer::{SerializerHandle, SerializerImpl};
 pub use traversal_policy::TraversalPolicy;

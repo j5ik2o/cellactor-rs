@@ -1,7 +1,7 @@
 //! Nested serializer orchestrator that walks aggregate schemas and produces field envelopes.
 
 use alloc::string::ToString;
-use core::any::Any;
+use core::{any::Any, time::Duration};
 
 use cellactor_utils_core_rs::sync::ArcShared;
 use erased_serde::Serialize as ErasedSerialize;
@@ -17,6 +17,7 @@ use super::{
   SerializedPayload,
   SerializationError,
   field_node::FieldNode,
+  serialization_telemetry::SerializationTelemetry,
   type_binding::TypeBinding,
 };
 use crate::RuntimeToolbox;
@@ -27,12 +28,16 @@ mod tests;
 /// Coordinates schema traversal and payload assembly for aggregates.
 pub(super) struct NestedSerializerOrchestrator<TB: RuntimeToolbox + 'static> {
   registry: ArcShared<SerializerRegistry<TB>>,
+  telemetry: ArcShared<dyn SerializationTelemetry>,
 }
 
 impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
   /// Creates a new orchestrator backed by the provided registry.
-  pub(super) fn new(registry: ArcShared<SerializerRegistry<TB>>) -> Self {
-    Self { registry }
+  pub(super) fn new(
+    registry: ArcShared<SerializerRegistry<TB>>,
+    telemetry: ArcShared<dyn SerializationTelemetry>,
+  ) -> Self {
+    Self { registry, telemetry }
   }
 
   /// Serializes the provided value, falling back to direct bindings when no aggregate schema exists.
@@ -67,6 +72,8 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
     accessors: &AggregateAccessors,
     binding: &ArcShared<TypeBinding>,
   ) -> Result<SerializedPayload, SerializationError> {
+    let telemetry = &*self.telemetry;
+    let _scope = AggregateTelemetryScope::new(telemetry);
     let plan = FieldTraversalEngine::build(schema)?;
     let mut builder = FieldEnvelopeBuilder::new(binding.serializer_id(), binding.manifest().to_string());
     for index in plan.iter() {
@@ -74,9 +81,30 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
         .fields()
         .get(index)
         .ok_or(SerializationError::InvalidAggregateSchema("field traversal index out of bounds"))?;
-      let field_value = accessors.extract(index, value)?;
-      let payload = self.serialize_field(node, field_value)?;
-      builder.append_child(&payload)?;
+      let field_hash = node.path_hash();
+      let field_value = match accessors.extract(index, value) {
+        Ok(field_value) => field_value,
+        Err(error) => {
+          telemetry.record_failure(field_hash, &error);
+          telemetry.record_latency(field_hash, Duration::ZERO);
+          return Err(error);
+        },
+      };
+      let payload = match self.serialize_field(node, field_value) {
+        Ok(payload) => payload,
+        Err(error) => {
+          telemetry.record_failure(field_hash, &error);
+          telemetry.record_latency(field_hash, Duration::ZERO);
+          return Err(error);
+        },
+      };
+      if let Err(error) = builder.append_child(&payload) {
+        telemetry.record_failure(field_hash, &error);
+        telemetry.record_latency(field_hash, Duration::ZERO);
+        return Err(error);
+      }
+      telemetry.record_success(field_hash);
+      telemetry.record_latency(field_hash, Duration::ZERO);
     }
     builder.finalize()
   }
@@ -98,5 +126,22 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
       let bytes = binding.serializer().serialize_erased(field_value.as_erased())?;
       Ok(FieldPayload::new(bytes, binding.manifest().to_string(), binding.serializer_id(), node.path_hash()))
     }
+  }
+}
+
+struct AggregateTelemetryScope<'a> {
+  telemetry: &'a dyn SerializationTelemetry,
+}
+
+impl<'a> AggregateTelemetryScope<'a> {
+  fn new(telemetry: &'a dyn SerializationTelemetry) -> Self {
+    telemetry.on_aggregate_start();
+    Self { telemetry }
+  }
+}
+
+impl<'a> Drop for AggregateTelemetryScope<'a> {
+  fn drop(&mut self) {
+    self.telemetry.on_aggregate_finish();
   }
 }
