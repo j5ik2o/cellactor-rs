@@ -36,7 +36,7 @@ graph TD
   - 依存関係: タスク1 完了後に着手。
   - _Requirements: R2.AC2, R2.AC4, R2.AC5_
 
-- [ ] 1.2 Pekko `Serializable` 互換型のデフォルト割当
+- [x] 1.2 Pekko `Serializable` 互換型のデフォルト割当
   - `PekkoSerializable` マーカー trait を導入し、互換型が登録された際に参照実装と同じ serializer_id/manifest を割り当てるロジックを追加する。
   - 重複検知とエラーハンドリングを実装し、割当結果を Telemetry で追跡できるようにする。
   - 完了条件: trait 実装で自動割当が行われるユニットテストと、衝突時にエラーを返すテストが追加される。

@@ -12,9 +12,12 @@ use cellactor_utils_core_rs::{
   sync::{ArcShared, sync_mutex_like::SyncMutexLike},
 };
 use hashbrown::{HashMap, hash_map::Entry};
+use portable_atomic::{AtomicU64, Ordering};
 
 use super::{
+  aggregate_accessors::AggregateAccessors,
   aggregate_schema::AggregateSchema,
+  aggregate_schema_registration::AggregateSchemaRegistration,
   constants::MAX_FIELD_PATH_BYTES,
   error::SerializationError,
   external_serializer_policy::ExternalSerializerPolicyEntry,
@@ -35,7 +38,10 @@ pub struct SerializerRegistry<TB: RuntimeToolbox + 'static> {
   type_bindings:     ToolboxMutex<HashMap<TypeId, ArcShared<TypeBinding>>, TB>,
   manifest_bindings: ToolboxMutex<HashMap<ManifestKey, ArcShared<TypeBinding>>, TB>,
   aggregate_schemas: ToolboxMutex<HashMap<TypeId, ArcShared<AggregateSchema>>, TB>,
+  aggregate_accessors: ToolboxMutex<HashMap<TypeId, ArcShared<AggregateAccessors>>, TB>,
   field_policies:    ToolboxMutex<HashMap<FieldPathHash, ExternalSerializerPolicyEntry>, TB>,
+  pekko_assignment_success: AtomicU64,
+  pekko_assignment_failure: AtomicU64,
 }
 
 impl<TB: RuntimeToolbox + 'static> Default for SerializerRegistry<TB> {
@@ -53,7 +59,10 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
       type_bindings:     <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
       manifest_bindings: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
       aggregate_schemas: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      aggregate_accessors: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
       field_policies:    <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      pekko_assignment_success: AtomicU64::new(0),
+      pekko_assignment_failure: AtomicU64::new(0),
     }
   }
 
@@ -142,6 +151,20 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
       .ok_or(SerializationError::NoSerializerForType(core::any::type_name::<T>()))
   }
 
+  /// Finds a type binding by [`TypeId`].
+  pub(super) fn find_binding_by_id(
+    &self,
+    type_id: TypeId,
+    type_name: &'static str,
+  ) -> Result<ArcShared<TypeBinding>, SerializationError> {
+    self
+      .type_bindings
+      .lock()
+      .get(&type_id)
+      .cloned()
+      .ok_or(SerializationError::NoSerializerForType(type_name))
+  }
+
   /// Finds a binding by manifest.
   pub(super) fn find_binding_by_manifest(
     &self,
@@ -183,7 +206,25 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
     let manifest_value =
       T::pekko_manifest().map(|value| value.to_string()).unwrap_or_else(|| core::any::type_name::<T>().to_string());
 
-    self.bind_type::<T, _>(&serializer, Some(manifest_value), T::pekko_decode)
+    match self.bind_type::<T, _>(&serializer, Some(manifest_value), T::pekko_decode) {
+      Ok(()) => {
+        self.pekko_assignment_success.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+      },
+      Err(error) => {
+        self.pekko_assignment_failure.fetch_add(1, Ordering::Relaxed);
+        Err(error)
+      },
+    }
+  }
+
+  /// Returns Pekko assignment counters for observability.
+  #[must_use]
+  pub fn pekko_assignment_metrics(&self) -> PekkoAssignmentMetrics {
+    PekkoAssignmentMetrics {
+      success_total: self.pekko_assignment_success.load(Ordering::Relaxed),
+      failure_total: self.pekko_assignment_failure.load(Ordering::Relaxed),
+    }
   }
 
   /// Returns whether an external serializer is allowed for the provided path, if known.
@@ -314,15 +355,27 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
   }
 
   /// Registers an aggregate schema for later lookups.
-  pub fn register_aggregate_schema(&self, schema: AggregateSchema) -> Result<(), SerializationError> {
+  pub fn register_aggregate_schema(&self, registration: AggregateSchemaRegistration) -> Result<(), SerializationError> {
+    let (schema, accessors) = registration.into_parts();
     let type_id = schema.root_type();
     let type_name = schema.root_type_name();
+    if accessors.root_type() != type_id {
+      return Err(SerializationError::InvalidAggregateSchema("accessor root mismatch"));
+    }
+    if accessors.len() != schema.fields().len() {
+      return Err(SerializationError::InvalidAggregateSchema("accessor count mismatch"));
+    }
+
     let schema_arc = ArcShared::new(schema);
+    let access_arc = ArcShared::new(accessors);
 
     let mut schemas_guard = self.aggregate_schemas.lock();
     if schemas_guard.contains_key(&type_id) {
       return Err(SerializationError::AggregateSchemaAlreadyRegistered(type_name));
     }
+
+    let mut access_guard = self.aggregate_accessors.lock();
+    access_guard.insert(type_id, access_arc);
 
     let mut policies_guard = self.field_policies.lock();
     for node in schema_arc.fields() {
@@ -344,6 +397,37 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
       .cloned()
       .ok_or(SerializationError::AggregateSchemaNotFound(core::any::type_name::<T>()))
   }
+
+  /// Loads a schema by [`TypeId`].
+  pub(super) fn load_schema_by_id(&self, type_id: TypeId) -> Option<ArcShared<AggregateSchema>> {
+    self.aggregate_schemas.lock().get(&type_id).cloned()
+  }
+
+  /// Loads the field accessors registered for the specified aggregate type.
+  pub fn load_accessors<T>(&self) -> Result<ArcShared<AggregateAccessors>, SerializationError>
+  where
+    T: Any + 'static, {
+    self
+      .aggregate_accessors
+      .lock()
+      .get(&TypeId::of::<T>())
+      .cloned()
+      .ok_or(SerializationError::AggregateSchemaNotFound(core::any::type_name::<T>()))
+  }
+
+  /// Loads field accessors by [`TypeId`].
+  pub(super) fn load_accessors_by_id(&self, type_id: TypeId) -> Option<ArcShared<AggregateAccessors>> {
+    self.aggregate_accessors.lock().get(&type_id).cloned()
+  }
+}
+
+/// Snapshot of Pekko assignment counters for observability surfaces.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PekkoAssignmentMetrics {
+  /// Number of successful automatic assignments.
+  pub success_total: u64,
+  /// Number of failed assignments (e.g., manifest collisions).
+  pub failure_total: u64,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]

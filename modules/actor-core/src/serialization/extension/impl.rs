@@ -10,14 +10,16 @@ use cellactor_utils_core_rs::sync::ArcShared;
 use serde::{Serialize, de::DeserializeOwned};
 
 use super::super::{
-  bincode_serializer::BincodeSerializer, error::SerializationError, payload::SerializedPayload,
-  pekko_serializable::PekkoSerializable, registry::SerializerRegistry, serializer::SerializerHandle,
+  bincode_serializer::BincodeSerializer, error::SerializationError, nested_serializer_orchestrator::NestedSerializerOrchestrator,
+  payload::SerializedPayload, pekko_serializable::PekkoSerializable, registry::SerializerRegistry,
+  serializer::SerializerHandle,
 };
 use crate::{RuntimeToolbox, extension::Extension};
 
 /// Serialization extension that manages serializer registration and bindings.
 pub struct Serialization<TB: RuntimeToolbox + 'static> {
   registry: ArcShared<SerializerRegistry<TB>>,
+  orchestrator: NestedSerializerOrchestrator<TB>,
 }
 
 impl<TB: RuntimeToolbox + 'static> Extension<TB> for Serialization<TB> {}
@@ -32,7 +34,8 @@ impl<TB: RuntimeToolbox + 'static> Serialization<TB> {
     if let Err(error) = registry.register_serializer(handle) {
       panic!("failed to register built-in serializer: {error}");
     }
-    Self { registry }
+    let orchestrator = NestedSerializerOrchestrator::new(registry.clone());
+    Self { registry, orchestrator }
   }
 
   /// Serializes the provided value into a [`SerializedPayload`].
@@ -43,10 +46,7 @@ impl<TB: RuntimeToolbox + 'static> Serialization<TB> {
   pub fn serialize<T>(&self, value: &T) -> Result<SerializedPayload, SerializationError>
   where
     T: Serialize + Send + Sync + 'static, {
-    let binding = self.registry.find_binding_by_type::<T>()?;
-    let erased: &dyn erased_serde::Serialize = value;
-    let bytes = binding.serializer().serialize_erased(erased)?;
-    Ok(SerializedPayload::new(binding.serializer_id(), binding.manifest().to_string(), bytes))
+    self.orchestrator.serialize(value)
   }
 
   /// Deserializes bytes into `T`, verifying the manifest along the way.

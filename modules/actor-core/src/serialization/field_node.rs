@@ -20,11 +20,17 @@ pub struct FieldNode {
   type_name: &'static str,
   envelope_mode: EnvelopeMode,
   external_serializer_allowed: bool,
+  accessor_index: u16,
 }
 
 impl FieldNode {
   /// Creates a new field node using the provided options.
-  pub fn new<T: Any + 'static>(path: FieldPath, display: FieldPathDisplay, options: FieldOptions) -> Self {
+  pub fn new<T: Any + 'static>(
+    path: FieldPath,
+    display: FieldPathDisplay,
+    options: FieldOptions,
+    accessor_index: u16,
+  ) -> Self {
     let path_hash = compute_field_path_hash(&path, &display);
     Self {
       path,
@@ -34,6 +40,7 @@ impl FieldNode {
       type_name: core::any::type_name::<T>(),
       envelope_mode: options.envelope_mode(),
       external_serializer_allowed: options.external_serializer_allowed(),
+      accessor_index,
     }
   }
 
@@ -77,5 +84,11 @@ impl FieldNode {
   #[must_use]
   pub const fn external_serializer_allowed(&self) -> bool {
     self.external_serializer_allowed
+  }
+
+  /// Returns the accessor index associated with this field.
+  #[must_use]
+  pub const fn accessor_index(&self) -> u16 {
+    self.accessor_index
   }
 }

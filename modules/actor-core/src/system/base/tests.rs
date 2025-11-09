@@ -159,6 +159,10 @@ struct ManifestRootB;
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 struct SharedField(u32);
 
+const PARENT_AGG_SAMPLE: ParentAggregate = ParentAggregate;
+const CHILD_AGG_SAMPLE: ChildAggregate = ChildAggregate(0);
+const SHARED_FIELD_SAMPLE: SharedField = SharedField(0);
+
 fn decode_child(bytes: &[u8]) -> Result<ChildAggregate, SerializationError> {
   bincode::serde::decode_from_slice(bytes, bincode::config::standard().with_fixed_int_encoding())
     .map(|(value, _)| value)
@@ -373,10 +377,11 @@ fn actor_system_bootstrap_fails_when_serialization_audit_fails() {
       FieldPathDisplay::from_str("parent").expect("display"),
     );
     builder
-      .add_value_field::<ChildAggregate>(
+      .add_value_field::<ChildAggregate, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("parent.child").expect("display"),
         false,
+        |_| &CHILD_AGG_SAMPLE,
       )
       .expect("add child");
     let schema = builder.finish().expect("schema");
@@ -409,10 +414,11 @@ fn actor_system_emits_serialization_audit_event_on_success() {
       FieldPathDisplay::from_str("parent").expect("display"),
     );
     builder
-      .add_value_field::<ChildAggregate>(
+      .add_value_field::<ChildAggregate, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("parent.child").expect("display"),
         false,
+        |_| &CHILD_AGG_SAMPLE,
       )
       .expect("add child");
     let schema = builder.finish().expect("schema");
@@ -463,10 +469,11 @@ fn actor_system_reports_serialization_audit_to_all_channels_on_failure() {
       FieldPathDisplay::from_str("parent").expect("display"),
     );
     builder
-      .add_value_field::<ChildAggregate>(
+      .add_value_field::<ChildAggregate, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("parent.child").expect("display"),
         false,
+        |_| &CHILD_AGG_SAMPLE,
       )
       .expect("add child");
     let schema = builder.finish().expect("schema");
@@ -519,10 +526,11 @@ fn actor_system_skips_serialization_audit_when_disabled() {
       FieldPathDisplay::from_str(NAME).expect("display"),
     );
     builder
-      .add_value_field::<ChildAggregate>(
+      .add_value_field::<ChildAggregate, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("parent.child").expect("display"),
         false,
+        |_| &CHILD_AGG_SAMPLE,
       )
       .expect("add child");
     registry.register_aggregate_schema(builder.finish().expect("schema")).expect("register schema");
@@ -559,10 +567,11 @@ fn actor_system_routes_serialization_audit_to_custom_notifier() {
       FieldPathDisplay::from_str("parent").expect("display"),
     );
     builder
-      .add_value_field::<ChildAggregate>(
+      .add_value_field::<ChildAggregate, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("parent.child").expect("display"),
         false,
+        |_| &CHILD_AGG_SAMPLE,
       )
       .expect("add child");
     let schema = builder.finish().expect("schema");
@@ -592,10 +601,11 @@ fn actor_system_bootstrap_fails_when_serialization_cycle_detected() {
       FieldPathDisplay::from_str("parent").expect("display"),
     );
     parent_builder
-      .add_value_field::<ChildAggregate>(
+      .add_value_field::<ChildAggregate, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("parent.child").expect("display"),
         false,
+        |_| &CHILD_AGG_SAMPLE,
       )
       .expect("add child");
 
@@ -604,10 +614,11 @@ fn actor_system_bootstrap_fails_when_serialization_cycle_detected() {
       FieldPathDisplay::from_str("child").expect("display"),
     );
     child_builder
-      .add_value_field::<ParentAggregate>(
+      .add_value_field::<ParentAggregate, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("child.parent").expect("display"),
         false,
+        |_| &PARENT_AGG_SAMPLE,
       )
       .expect("add parent");
 
@@ -630,10 +641,11 @@ fn actor_system_bootstrap_fails_when_manifest_collides() {
       FieldPathDisplay::from_str("root_a").expect("display"),
     );
     builder_a
-      .add_value_field::<SharedField>(
+      .add_value_field::<SharedField, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("shared.manifest").expect("display"),
         false,
+        |_| &SHARED_FIELD_SAMPLE,
       )
       .expect("add shared field");
 
@@ -642,10 +654,11 @@ fn actor_system_bootstrap_fails_when_manifest_collides() {
       FieldPathDisplay::from_str("root_b").expect("display"),
     );
     builder_b
-      .add_value_field::<SharedField>(
+      .add_value_field::<SharedField, _>(
         FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
         FieldPathDisplay::from_str("shared.manifest").expect("display"),
         false,
+        |_| &SHARED_FIELD_SAMPLE,
       )
       .expect("add shared field");
 

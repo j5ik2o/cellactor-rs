@@ -1,6 +1,6 @@
 //! Marker trait for Pekko-compatible default serialization bindings.
 
-use bincode::config::Config;
+use alloc::string::ToString;
 use serde::{Serialize, de::DeserializeOwned};
 
 use super::error::SerializationError;

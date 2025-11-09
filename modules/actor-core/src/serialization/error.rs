@@ -25,6 +25,8 @@ pub enum SerializationError {
   AggregateSchemaAlreadyRegistered(&'static str),
   /// Aggregate schema for the given type could not be found.
   AggregateSchemaNotFound(&'static str),
+  /// Aggregate value failed to downcast to the expected type.
+  InvalidAggregateValue(&'static str),
   /// Serialization failed.
   SerializationFailed(String),
   /// Deserialization failed.
@@ -53,6 +55,7 @@ impl fmt::Display for SerializationError {
         write!(f, "aggregate schema already registered for type {ty}")
       },
       | Self::AggregateSchemaNotFound(ty) => write!(f, "aggregate schema not found for type {ty}"),
+      | Self::InvalidAggregateValue(ty) => write!(f, "aggregate value does not match type {ty}"),
       | Self::SerializationFailed(reason) => write!(f, "serialization failed: {reason}"),
       | Self::DeserializationFailed(reason) => write!(f, "deserialization failed: {reason}"),
       | Self::TypeMismatch { expected, found } => {

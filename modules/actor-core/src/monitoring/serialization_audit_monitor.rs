@@ -2,7 +2,7 @@
 
 use cellactor_utils_core_rs::sync::ArcShared;
 
-use crate::{RuntimeToolbox, event_stream::SerializationAuditEvent, system::system_state::SystemStateGeneric};
+use crate::{RuntimeToolbox, event_stream::SerializationAuditEvent, system::SystemStateGeneric};
 
 /// Exposes serialization audit state for monitoring endpoints.
 pub struct SerializationAuditMonitor<TB: RuntimeToolbox + 'static> {

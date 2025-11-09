@@ -66,11 +66,16 @@ struct Parent;
 #[allow(dead_code)]
 struct Child(u32);
 
-#[derive(Debug)]
+const CHILD_SAMPLE: Child = Child(0);
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 struct CycleA;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 struct CycleB;
+
+static CYCLE_A_SAMPLE: CycleA = CycleA;
+static CYCLE_B_SAMPLE: CycleB = CycleB;
 
 #[derive(Debug)]
 struct ManifestA;
@@ -109,10 +114,11 @@ fn registers_aggregate_schema_and_loads_it() {
     FieldPathDisplay::from_str("parent").expect("parent"),
   );
   builder
-    .add_field::<Child>(
+    .add_field::<Child, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("parent.child").expect("display"),
       FieldOptions::new(EnvelopeMode::PreserveOrder),
+      |_| &CHILD_SAMPLE,
     )
     .expect("add child");
   let schema = builder.finish().expect("schema");
@@ -122,16 +128,47 @@ fn registers_aggregate_schema_and_loads_it() {
 }
 
 #[test]
+fn load_accessors_extracts_values() {
+  #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+  struct WithField {
+    child: Child,
+  }
+
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+  let mut builder = AggregateSchemaBuilder::<WithField>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("with_field").expect("display"),
+  );
+  builder
+    .add_value_field::<Child, _>(
+      FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
+      FieldPathDisplay::from_str("with_field.child").expect("display"),
+      false,
+      |aggregate| &aggregate.child,
+    )
+    .expect("add child");
+  registry.register_aggregate_schema(builder.finish().expect("registration")).expect("register schema");
+
+  let schema = registry.load_schema::<WithField>().expect("schema");
+  let accessors = registry.load_accessors::<WithField>().expect("accessors");
+  let aggregate = WithField { child: Child(99) };
+  let index = schema.fields()[0].accessor_index() as usize;
+  let value = accessors.extract(index, &aggregate).expect("extracted child");
+  assert_eq!(value.as_any().downcast_ref::<Child>().expect("child").0, 99);
+}
+
+#[test]
 fn rejects_external_serializer_for_non_pure_value() {
   let mut builder = AggregateSchemaBuilder::<Parent>::new(
     TraversalPolicy::DepthFirst,
     FieldPathDisplay::from_str("parent").expect("parent"),
   );
   let err = builder
-    .add_field::<alloc::vec::Vec<u8>>(
+    .add_field::<alloc::vec::Vec<u8>, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("parent.bytes").expect("display"),
       FieldOptions::new(EnvelopeMode::PreserveOrder).with_external_serializer_allowed(true),
+      |_| -> &alloc::vec::Vec<u8> { unreachable!("validator should fail before accessor") },
     )
     .expect_err("should reject non-pure value");
   assert!(matches!(err, SerializationError::InvalidAggregateSchema(_)));
@@ -144,10 +181,11 @@ fn rejects_external_serializer_when_envelope_mode_not_supported() {
     FieldPathDisplay::from_str("parent").expect("parent"),
   );
   let err = builder
-    .add_field::<Child>(
+    .add_field::<Child, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("parent.child").expect("display"),
       FieldOptions::new(EnvelopeMode::Raw).with_external_serializer_allowed(true),
+      |_| &CHILD_SAMPLE,
     )
     .expect_err("should reject raw envelope");
   assert!(matches!(err, SerializationError::InvalidAggregateSchema(_)));
@@ -161,10 +199,11 @@ fn duplicate_schema_registration_fails() {
     FieldPathDisplay::from_str("parent").expect("display"),
   );
   builder
-    .add_value_field::<Child>(
+    .add_value_field::<Child, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("parent.child").expect("display"),
       false,
+      |_| &CHILD_SAMPLE,
     )
     .expect("add field");
   let schema = builder.finish().expect("schema");
@@ -188,10 +227,11 @@ fn field_policy_lookup_succeeds() {
     FieldPathDisplay::from_str("parent").expect("display"),
   );
   builder
-    .add_value_field::<Child>(
+    .add_value_field::<Child, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("parent.child").expect("display"),
       true,
+      |_| &CHILD_SAMPLE,
     )
     .expect("add field");
   let schema = builder.finish().expect("schema");
@@ -209,10 +249,11 @@ fn audit_reports_missing_serializer() {
     FieldPathDisplay::from_str("parent").expect("display"),
   );
   builder
-    .add_value_field::<Child>(
+    .add_value_field::<Child, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("parent.child").expect("display"),
       false,
+      |_| &CHILD_SAMPLE,
     )
     .expect("add child");
   let schema = builder.finish().expect("schema");
@@ -235,10 +276,11 @@ fn audit_succeeds_when_all_fields_are_bound() {
     FieldPathDisplay::from_str("parent").expect("display"),
   );
   builder
-    .add_value_field::<Child>(
+    .add_value_field::<Child, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("parent.child").expect("display"),
       false,
+      |_| &CHILD_SAMPLE,
     )
     .expect("add child");
   let schema = builder.finish().expect("schema");
@@ -259,10 +301,11 @@ fn audit_detects_cycles_in_registered_schemas() {
     FieldPathDisplay::from_str("cycle_a").expect("display"),
   );
   builder_a
-    .add_value_field::<CycleB>(
+    .add_value_field::<CycleB, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("cycle_a.next").expect("display"),
       false,
+      |_| &CYCLE_B_SAMPLE,
     )
     .expect("add field");
 
@@ -271,10 +314,11 @@ fn audit_detects_cycles_in_registered_schemas() {
     FieldPathDisplay::from_str("cycle_b").expect("display"),
   );
   builder_b
-    .add_value_field::<CycleA>(
+    .add_value_field::<CycleA, _>(
       FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
       FieldPathDisplay::from_str("cycle_b.next").expect("display"),
       false,
+      |_| &CYCLE_A_SAMPLE,
     )
     .expect("add field");
 
@@ -346,4 +390,33 @@ fn assign_default_serializer_detects_manifest_collision() {
   registry.assign_default_serializer::<CustomManifestType>().expect("first assign");
   let error = registry.assign_default_serializer::<DuplicateManifestType>().expect_err("collision should fail");
   assert!(matches!(error, SerializationError::InvalidManifest(manifest) if manifest == "pekko.custom"));
+}
+
+#[test]
+fn pekko_assignment_metrics_track_success_and_failure() {
+  let registry = SerializerRegistry::<NoStdToolbox>::new();
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle).expect("register serializer");
+
+  let metrics = registry.pekko_assignment_metrics();
+  assert_eq!(metrics.success_total, 0);
+  assert_eq!(metrics.failure_total, 0);
+
+  registry.assign_default_serializer::<AutoType>().expect("auto assign");
+  let metrics = registry.pekko_assignment_metrics();
+  assert_eq!(metrics.success_total, 1);
+  assert_eq!(metrics.failure_total, 0);
+
+  // idempotent assignment should not change counters
+  registry.assign_default_serializer::<AutoType>().expect("idempotent assign");
+  let metrics = registry.pekko_assignment_metrics();
+  assert_eq!(metrics.success_total, 1);
+  assert_eq!(metrics.failure_total, 0);
+
+  // manifest collision increments failure counter
+  registry.assign_default_serializer::<CustomManifestType>().expect("custom assign");
+  let _ = registry.assign_default_serializer::<DuplicateManifestType>().expect_err("collision should fail");
+  let metrics = registry.pekko_assignment_metrics();
+  assert_eq!(metrics.success_total, 2);
+  assert_eq!(metrics.failure_total, 1);
 }
