@@ -14,8 +14,8 @@ use cellactor_actor_core_rs::{
   messaging::AnyMessageView,
   props::Props,
   serialization::{
-    AggregateSchemaBuilder, Bytes, FieldPath, FieldPathDisplay, FieldPathSegment, SERIALIZATION_EXTENSION,
-    Serialization, SerializationError, SerializedPayload, SerializerHandle, SerializerImpl, TraversalPolicy,
+    AggregateSchemaBuilder, FieldPath, FieldPathDisplay, FieldPathSegment, SERIALIZATION_EXTENSION, Serialization,
+    SerializationError, SerializerHandle, SerializerImpl, TraversalPolicy,
   },
   system::ActorSystem,
 };
@@ -80,7 +80,9 @@ fn main() {
   let payload = serialization.serialize(&order).expect("serialize order");
   println!("manifest={} bytes={}", payload.manifest(), payload.bytes().len());
 
-  let decoded = decode_purchase_order(serialization.clone(), &payload).expect("decode order");
+  let decoded = serialization
+    .deserialize::<PurchaseOrder>(payload.bytes().as_ref(), payload.manifest())
+    .expect("deserialize order");
   println!("decoded name={} sku={}", decoded.customer.name, decoded.line.sku);
 
   trigger_external_serializer(&serialization);
@@ -233,27 +235,19 @@ impl SerializerImpl for DemoSerializer {
 }
 
 fn decode_customer(bytes: &[u8]) -> Result<Customer, SerializationError> {
-  bincode::serde::decode_from_slice(bytes, bincode_config())
-    .map(|(value, _)| value)
-    .map_err(|err| SerializationError::DeserializationFailed(err.to_string()))
+  decode_with::<Customer>(bytes)
 }
 
 fn decode_order_line(bytes: &[u8]) -> Result<OrderLine, SerializationError> {
-  bincode::serde::decode_from_slice(bytes, bincode_config())
-    .map(|(value, _)| value)
-    .map_err(|err| SerializationError::DeserializationFailed(err.to_string()))
+  decode_with::<OrderLine>(bytes)
 }
 
 fn decode_order(bytes: &[u8]) -> Result<PurchaseOrder, SerializationError> {
-  bincode::serde::decode_from_slice(bytes, bincode_config())
-    .map(|(value, _)| value)
-    .map_err(|err| SerializationError::DeserializationFailed(err.to_string()))
+  decode_purchase_order_bytes(bytes)
 }
 
 fn decode_external_order(bytes: &[u8]) -> Result<ExternalOrder, SerializationError> {
-  bincode::serde::decode_from_slice(bytes, bincode_config())
-    .map(|(value, _)| value)
-    .map_err(|err| SerializationError::DeserializationFailed(err.to_string()))
+  decode_with::<ExternalOrder>(bytes)
 }
 
 fn decode_with<T>(bytes: &[u8]) -> Result<T, SerializationError>
@@ -282,11 +276,8 @@ fn bincode_config() -> impl Config {
 
 // TODO(serializer-nested-field#4.3-followup): FieldEnvelopeParser などの公開 API が整備されたら
 //           AGGR ヘッダ解析を差し替えて、この冗長な手動デコード処理を撤去する。
-fn decode_purchase_order(
-  serialization: ArcShared<Serialization<NoStdToolbox>>,
-  payload: &SerializedPayload,
-) -> Result<PurchaseOrder, SerializationError> {
-  let mut cursor = payload.bytes().as_ref();
+fn decode_purchase_order_bytes(bytes: &[u8]) -> Result<PurchaseOrder, SerializationError> {
+  let mut cursor = bytes;
   if cursor.len() < 4 || &cursor[..4] != b"AGGR" {
     return Err(SerializationError::DeserializationFailed("invalid aggregate header".into()));
   }
@@ -298,7 +289,7 @@ fn decode_purchase_order(
   for _ in 0..count {
     let (field_hash, rest) = read_u128(cursor)?;
     cursor = rest;
-    let (serializer_id, rest) = read_u32(cursor)?;
+    let (_serializer_id, rest) = read_u32(cursor)?;
     cursor = rest;
     let (manifest_len, rest) = read_u16(cursor)?;
     cursor = rest;
@@ -314,35 +305,21 @@ fn decode_purchase_order(
     if cursor.len() < payload_len as usize {
       return Err(SerializationError::DeserializationFailed("payload length overflow".into()));
     }
-    let child_bytes = cursor[..payload_len as usize].to_vec();
+    let child_bytes = &cursor[..payload_len as usize];
     cursor = &cursor[payload_len as usize..];
 
-    let child_payload = SerializedPayload::new(serializer_id, manifest.clone(), Bytes::from_vec(child_bytes));
-    let value = serialization.deserialize_payload(&child_payload)?;
     match manifest.as_str() {
       | "demo.customer" => {
         if customer.is_some() {
           return Err(SerializationError::DeserializationFailed("duplicate customer field in aggregate".into()));
         }
-        customer = Some(
-          value
-            .downcast::<Customer>()
-            .map_err(|_| SerializationError::DeserializationFailed("customer".into()))?
-            .as_ref()
-            .clone(),
-        );
+        customer = Some(decode_customer(child_bytes)?);
       },
       | "demo.line" => {
         if line.is_some() {
           return Err(SerializationError::DeserializationFailed("duplicate line field in aggregate".into()));
         }
-        line = Some(
-          value
-            .downcast::<OrderLine>()
-            .map_err(|_| SerializationError::DeserializationFailed("line".into()))?
-            .as_ref()
-            .clone(),
-        );
+        line = Some(decode_order_line(child_bytes)?);
       },
       | other => {
         return Err(SerializationError::DeserializationFailed(format!(
