@@ -9,7 +9,11 @@ use cellactor_utils_core_rs::{
 };
 use hashbrown::{HashMap, hash_map::Entry};
 
-use super::{error::SerializationError, serializer::SerializerHandle, type_binding::TypeBinding};
+use super::{
+  aggregate_schema::AggregateSchema, error::SerializationError,
+  external_serializer_policy::ExternalSerializerPolicyEntry, field_path_hash::FieldPathHash,
+  serializer::SerializerHandle, type_binding::TypeBinding,
+};
 use crate::{RuntimeToolbox, ToolboxMutex};
 
 #[cfg(test)]
@@ -20,6 +24,8 @@ pub struct SerializerRegistry<TB: RuntimeToolbox + 'static> {
   serializers:       ToolboxMutex<HashMap<u32, SerializerHandle>, TB>,
   type_bindings:     ToolboxMutex<HashMap<TypeId, ArcShared<TypeBinding>>, TB>,
   manifest_bindings: ToolboxMutex<HashMap<ManifestKey, ArcShared<TypeBinding>>, TB>,
+  aggregate_schemas: ToolboxMutex<HashMap<TypeId, ArcShared<AggregateSchema>>, TB>,
+  field_policies:    ToolboxMutex<HashMap<FieldPathHash, ExternalSerializerPolicyEntry>, TB>,
 }
 
 impl<TB: RuntimeToolbox + 'static> Default for SerializerRegistry<TB> {
@@ -36,6 +42,8 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
       serializers:       <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
       type_bindings:     <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
       manifest_bindings: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      aggregate_schemas: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      field_policies:    <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
     }
   }
 
@@ -150,6 +158,44 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
   where
     T: Any + 'static, {
     self.type_bindings.lock().contains_key(&TypeId::of::<T>())
+  }
+
+  /// Returns whether an external serializer is allowed for the provided path, if known.
+  #[must_use]
+  pub fn field_policy(&self, hash: FieldPathHash) -> Option<bool> {
+    self.field_policies.lock().get(&hash).map(|entry| entry.external_allowed())
+  }
+
+  /// Registers an aggregate schema for later lookups.
+  pub fn register_aggregate_schema(&self, schema: AggregateSchema) -> Result<(), SerializationError> {
+    let type_id = schema.root_type();
+    let type_name = schema.root_type_name();
+    let schema_arc = ArcShared::new(schema);
+
+    let mut schemas_guard = self.aggregate_schemas.lock();
+    if schemas_guard.contains_key(&type_id) {
+      return Err(SerializationError::AggregateSchemaAlreadyRegistered(type_name));
+    }
+
+    let mut policies_guard = self.field_policies.lock();
+    for node in schema_arc.fields() {
+      policies_guard.insert(node.path_hash(), ExternalSerializerPolicyEntry::from_field_node(node));
+    }
+
+    schemas_guard.insert(type_id, schema_arc);
+    Ok(())
+  }
+
+  /// Loads the schema registered for the specified aggregate type.
+  pub fn load_schema<T>(&self) -> Result<ArcShared<AggregateSchema>, SerializationError>
+  where
+    T: Any + 'static, {
+    self
+      .aggregate_schemas
+      .lock()
+      .get(&TypeId::of::<T>())
+      .cloned()
+      .ok_or(SerializationError::AggregateSchemaNotFound(core::any::type_name::<T>()))
   }
 }
 

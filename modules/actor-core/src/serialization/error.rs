@@ -19,6 +19,12 @@ pub enum SerializationError {
   SerializerNotFound(u32),
   /// Type-level serializer is missing.
   NoSerializerForType(&'static str),
+  /// Aggregate schema definition is invalid.
+  InvalidAggregateSchema(&'static str),
+  /// Aggregate schema for the given type is already registered.
+  AggregateSchemaAlreadyRegistered(&'static str),
+  /// Aggregate schema for the given type could not be found.
+  AggregateSchemaNotFound(&'static str),
   /// Serialization failed.
   SerializationFailed(String),
   /// Deserialization failed.
@@ -42,6 +48,11 @@ impl fmt::Display for SerializationError {
       | Self::InvalidManifest(manifest) => write!(f, "invalid manifest '{manifest}'"),
       | Self::SerializerNotFound(id) => write!(f, "serializer {id} not found"),
       | Self::NoSerializerForType(ty) => write!(f, "no serializer registered for type {ty}"),
+      | Self::InvalidAggregateSchema(reason) => write!(f, "invalid aggregate schema: {reason}"),
+      | Self::AggregateSchemaAlreadyRegistered(ty) => {
+        write!(f, "aggregate schema already registered for type {ty}")
+      },
+      | Self::AggregateSchemaNotFound(ty) => write!(f, "aggregate schema not found for type {ty}"),
       | Self::SerializationFailed(reason) => write!(f, "serialization failed: {reason}"),
       | Self::DeserializationFailed(reason) => write!(f, "deserialization failed: {reason}"),
       | Self::TypeMismatch { expected, found } => {

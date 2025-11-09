@@ -22,7 +22,7 @@ graph TD
   T4 --> T4c[4.3 性能]
 ```
 
-- [ ] 1. Serializer Registry とスキーマ宣言の拡張
+- [x] 1. Serializer Registry とスキーマ宣言の拡張
   - TypeId ごとの `AggregateSchema` と `FieldPath`/`FieldPathDisplay`/`FieldPathHash` メタデータを保持できるようにし、登録 API で全フィールド宣言と `external_serializer_allowed` フラグを必須化する。
   - `AggregateSchemaBuilder` で純粋値型・親エンベロープモード・`FieldPathDisplay` 長さを静的検証し、ValidationError を明示する。
   - `ExternalSerializerPolicy` とフィールドポリシーキャッシュをレジストリに統合し、実行時のポリシー判定を O(1) で行えるようにする。
