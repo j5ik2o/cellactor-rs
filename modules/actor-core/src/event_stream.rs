@@ -16,4 +16,7 @@ pub use event_stream_subscriber::EventStreamSubscriber;
 pub use event_stream_subscriber_entry::{EventStreamSubscriberEntry, EventStreamSubscriberEntryGeneric};
 pub use event_stream_subscription::{EventStreamSubscription, EventStreamSubscriptionGeneric};
 pub use serialization_event::{SerializationAuditEvent, SerializationAuditIssue};
-pub use serialization_runtime_event::{SerializationEvent, SerializationEventKind, SerializationFailureKind};
+pub use serialization_runtime_event::{
+  SerializationDebugInfo, SerializationEvent, SerializationEventKind, SerializationFailureKind,
+  SerializationFallbackReason,
+};

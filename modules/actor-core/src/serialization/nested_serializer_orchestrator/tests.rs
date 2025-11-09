@@ -11,6 +11,7 @@ use spin::Mutex;
 use super::NestedSerializerOrchestrator;
 use crate::{
   NoStdToolbox,
+  event_stream::SerializationFallbackReason,
   serialization::{
     AggregateSchemaBuilder, BincodeSerializer, FieldPath, FieldPathDisplay, FieldPathHash, FieldPathSegment,
     NoopSerializationTelemetry, SerializationError, SerializationTelemetry, SerializerHandle, SerializerRegistry,
@@ -37,6 +38,12 @@ fn decode_envelope(bytes: &[u8]) -> Result<EnvelopeAggregate, SerializationError
   bincode::serde::decode_from_slice(bytes, bincode::config::standard().with_fixed_int_encoding())
     .map(|(value, _)| value)
     .map_err(|error| SerializationError::DeserializationFailed(error.to_string()))
+}
+
+fn encoded_leaf_len(value: &Leaf) -> usize {
+  bincode::serde::encode_to_vec(value, bincode::config::standard().with_fixed_int_encoding())
+    .expect("encode")
+    .len()
 }
 
 #[test]
@@ -88,13 +95,17 @@ fn orchestrator_notifies_telemetry_hooks() {
   let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry.clone());
   let aggregate = EnvelopeAggregate { first: Leaf(1), second: Leaf(2) };
   let _ = orchestrator.serialize(&aggregate).expect("serialize");
+  let first_size = encoded_leaf_len(&aggregate.first);
+  let second_size = encoded_leaf_len(&aggregate.second);
 
   let events = telemetry.snapshot();
   assert_eq!(events, vec![
     TelemetryCall::AggregateStart,
     TelemetryCall::FieldSuccess(hashes[0]),
+    TelemetryCall::FieldDebugTrace(hashes[0], String::from("leaf"), first_size),
     TelemetryCall::FieldLatency(hashes[0], Duration::ZERO),
     TelemetryCall::FieldSuccess(hashes[1]),
+    TelemetryCall::FieldDebugTrace(hashes[1], String::from("leaf"), second_size),
     TelemetryCall::FieldLatency(hashes[1], Duration::ZERO),
     TelemetryCall::AggregateFinish,
   ]);
@@ -123,6 +134,8 @@ fn orchestrator_notifies_failure_telemetry() {
   let events = telemetry.snapshot();
   assert_eq!(events, vec![
     TelemetryCall::AggregateStart,
+    TelemetryCall::Fallback(hash, SerializationFallbackReason::MissingSerializer),
+    TelemetryCall::Fallback(hash, SerializationFallbackReason::ExternalNotAllowed),
     TelemetryCall::FieldFailure(hash),
     TelemetryCall::FieldLatency(hash, Duration::ZERO),
     TelemetryCall::AggregateFinish,
@@ -150,6 +163,34 @@ fn orchestrator_serializes_allowed_field_with_external_adapter() {
   assert_eq!(entry.manifest, core::any::type_name::<Leaf>());
   assert_eq!(decode_leaf(entry.bytes.as_slice()).expect("decode"), Leaf(11));
   assert!(cursor.is_empty());
+}
+
+#[test]
+fn orchestrator_reports_external_telemetry_events() {
+  let registry = ArcShared::new(SerializerRegistry::<NoStdToolbox>::new());
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register handle");
+  registry.bind_type::<EnvelopeAggregate, _>(&handle, Some("external".into()), decode_envelope).expect("bind env");
+  register_external_schema(&registry);
+  let schema = registry.load_schema::<EnvelopeAggregate>().expect("schema");
+  let hash = schema.fields()[0].path_hash();
+
+  let telemetry = ArcShared::new(TelemetryProbe::new());
+  let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry.clone());
+  let aggregate = EnvelopeAggregate { first: Leaf(11), second: Leaf(0) };
+  let _ = orchestrator.serialize(&aggregate).expect("serialize");
+
+  let leaf_size = encoded_leaf_len(&aggregate.first);
+  let events = telemetry.snapshot();
+  assert_eq!(events, vec![
+    TelemetryCall::AggregateStart,
+    TelemetryCall::Fallback(hash, SerializationFallbackReason::MissingSerializer),
+    TelemetryCall::ExternalSuccess(hash),
+    TelemetryCall::FieldSuccess(hash),
+    TelemetryCall::FieldDebugTrace(hash, core::any::type_name::<Leaf>().to_string(), leaf_size),
+    TelemetryCall::FieldLatency(hash, Duration::ZERO),
+    TelemetryCall::AggregateFinish,
+  ]);
 }
 
 fn register_envelope_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox>>) {
@@ -240,6 +281,10 @@ enum TelemetryCall {
   FieldSuccess(FieldPathHash),
   FieldFailure(FieldPathHash),
   FieldLatency(FieldPathHash, Duration),
+  FieldDebugTrace(FieldPathHash, String, usize),
+  Fallback(FieldPathHash, SerializationFallbackReason),
+  ExternalSuccess(FieldPathHash),
+  ExternalFailure(FieldPathHash),
 }
 
 #[derive(Default)]
@@ -280,5 +325,21 @@ impl SerializationTelemetry for TelemetryProbe {
 
   fn record_failure(&self, field_path_hash: FieldPathHash, _error: &SerializationError) {
     self.push(TelemetryCall::FieldFailure(field_path_hash));
+  }
+
+  fn record_fallback(&self, field_path_hash: FieldPathHash, reason: SerializationFallbackReason) {
+    self.push(TelemetryCall::Fallback(field_path_hash, reason));
+  }
+
+  fn record_external_success(&self, field_path_hash: FieldPathHash) {
+    self.push(TelemetryCall::ExternalSuccess(field_path_hash));
+  }
+
+  fn record_external_failure(&self, field_path_hash: FieldPathHash, _error: &SerializationError) {
+    self.push(TelemetryCall::ExternalFailure(field_path_hash));
+  }
+
+  fn record_debug_trace(&self, field_path_hash: FieldPathHash, manifest: &str, size_bytes: usize) {
+    self.push(TelemetryCall::FieldDebugTrace(field_path_hash, manifest.to_string(), size_bytes));
   }
 }

@@ -15,7 +15,7 @@ use super::super::{
   pekko_serializable::PekkoSerializable, registry::SerializerRegistry, serialization_telemetry::SerializationTelemetry,
   serializer::SerializerHandle, telemetry_config::TelemetryConfig, telemetry_service::TelemetryService,
 };
-use crate::{RuntimeToolbox, event_stream::EventStreamGeneric, extension::Extension};
+use crate::{RuntimeToolbox, extension::Extension, system::SystemStateGeneric};
 
 /// Serialization extension that manages serializer registration and bindings.
 pub struct Serialization<TB: RuntimeToolbox + 'static> {
@@ -30,13 +30,13 @@ unsafe impl<TB: RuntimeToolbox + 'static> Send for Serialization<TB> {}
 unsafe impl<TB: RuntimeToolbox + 'static> Sync for Serialization<TB> {}
 
 impl<TB: RuntimeToolbox + 'static> Serialization<TB> {
-  pub(super) fn new(event_stream: ArcShared<EventStreamGeneric<TB>>) -> Self {
+  pub(super) fn new(system_state: ArcShared<SystemStateGeneric<TB>>) -> Self {
     let registry = ArcShared::new(SerializerRegistry::new());
     let handle = SerializerHandle::new(BincodeSerializer);
     if let Err(error) = registry.register_serializer(handle) {
       panic!("failed to register built-in serializer: {error}");
     }
-    let telemetry_impl = ArcShared::new(TelemetryService::new(event_stream, TelemetryConfig::default()));
+    let telemetry_impl = ArcShared::new(TelemetryService::new(system_state, TelemetryConfig::default()));
     let telemetry_trait: ArcShared<dyn SerializationTelemetry> = telemetry_impl.clone();
     let orchestrator = NestedSerializerOrchestrator::new(registry.clone(), telemetry_trait);
     Self { registry, orchestrator, telemetry: telemetry_impl }

@@ -1,5 +1,6 @@
 //! Telemetry service that emits serialization runtime events.
 
+use alloc::string::ToString;
 use core::time::Duration;
 
 use cellactor_utils_core_rs::sync::ArcShared;
@@ -9,10 +10,14 @@ use super::{
   telemetry_counters::TelemetryCounters,
 };
 use crate::{
+  dead_letter::DeadLetterReason,
   RuntimeToolbox,
   event_stream::{
-    EventStreamEvent, EventStreamGeneric, SerializationEvent, SerializationEventKind, SerializationFailureKind,
+    EventStreamEvent, SerializationDebugInfo, SerializationEvent, SerializationEventKind, SerializationFailureKind,
+    SerializationFallbackReason,
   },
+  messaging::AnyMessageGeneric,
+  system::SystemStateGeneric,
 };
 
 #[cfg(test)]
@@ -20,7 +25,7 @@ mod tests;
 
 /// Concrete telemetry backend wired to the runtime event stream.
 pub struct TelemetryService<TB: RuntimeToolbox + 'static> {
-  event_stream: ArcShared<EventStreamGeneric<TB>>,
+  system_state: ArcShared<SystemStateGeneric<TB>>,
   config:       TelemetryConfig,
   counters:     TelemetryCounters,
 }
@@ -28,8 +33,8 @@ pub struct TelemetryService<TB: RuntimeToolbox + 'static> {
 impl<TB: RuntimeToolbox + 'static> TelemetryService<TB> {
   /// Creates a new telemetry service for the provided event stream.
   #[must_use]
-  pub fn new(event_stream: ArcShared<EventStreamGeneric<TB>>, config: TelemetryConfig) -> Self {
-    Self { event_stream, config, counters: TelemetryCounters::new() }
+  pub fn new(system_state: ArcShared<SystemStateGeneric<TB>>, config: TelemetryConfig) -> Self {
+    Self { system_state, config, counters: TelemetryCounters::new() }
   }
 
   /// Returns the mutable telemetry configuration.
@@ -38,8 +43,33 @@ impl<TB: RuntimeToolbox + 'static> TelemetryService<TB> {
     &self.config
   }
 
+  /// Returns a reference to the aggregated counters.
+  #[must_use]
+  pub fn counters(&self) -> &TelemetryCounters {
+    &self.counters
+  }
+
   fn publish(&self, event: SerializationEvent) {
-    self.event_stream.publish(&EventStreamEvent::Serialization(event));
+    self
+      .system_state
+      .publish_event(&EventStreamEvent::Serialization(event));
+  }
+
+  fn to_micros(elapsed: Duration) -> u64 {
+    let micros = elapsed.as_micros();
+    if micros > u64::MAX as u128 {
+      u64::MAX
+    } else {
+      micros as u64
+    }
+  }
+
+  fn clamp_size(size_bytes: usize) -> u32 {
+    if size_bytes > u32::MAX as usize {
+      u32::MAX
+    } else {
+      size_bytes as u32
+    }
   }
 
   fn failure_kind(error: &SerializationError) -> SerializationFailureKind {
@@ -58,8 +88,13 @@ impl<TB: RuntimeToolbox + 'static> SerializationTelemetry for TelemetryService<T
 
   fn on_aggregate_finish(&self) {}
 
-  fn record_latency(&self, _field_path_hash: FieldPathHash, _elapsed: Duration) {
-    // Latency publishing will be implemented once threshold logic (Task 3.1) is active.
+  fn record_latency(&self, field_path_hash: FieldPathHash, elapsed: Duration) {
+    let micros = Self::to_micros(elapsed);
+    if micros < self.config.latency_threshold_us() {
+      return;
+    }
+    let event = SerializationEvent::new(field_path_hash, SerializationEventKind::Latency(micros));
+    self.publish(event);
   }
 
   fn record_success(&self, field_path_hash: FieldPathHash) {
@@ -72,6 +107,33 @@ impl<TB: RuntimeToolbox + 'static> SerializationTelemetry for TelemetryService<T
     let _ = self.counters.record_failure();
     let kind = Self::failure_kind(error);
     let event = SerializationEvent::new(field_path_hash, SerializationEventKind::Failure(kind));
+    if matches!(kind, SerializationFailureKind::MissingSerializer) {
+      self.system_state.record_serialization_binding_error(&event);
+    }
+    self.publish(event);
+  }
+
+  fn record_fallback(&self, field_path_hash: FieldPathHash, reason: SerializationFallbackReason) {
+    let event = SerializationEvent::new(field_path_hash, SerializationEventKind::Fallback(reason));
+    self.publish(event.clone());
+    let payload = AnyMessageGeneric::<TB>::new(event);
+    self.system_state.record_dead_letter(payload, DeadLetterReason::ExplicitRouting, None);
+  }
+
+  fn record_external_success(&self, _field_path_hash: FieldPathHash) {
+    let _ = self.counters.record_external_success();
+  }
+
+  fn record_external_failure(&self, _field_path_hash: FieldPathHash, _error: &SerializationError) {
+    let _ = self.counters.record_external_failure();
+  }
+
+  fn record_debug_trace(&self, field_path_hash: FieldPathHash, manifest: &str, size_bytes: usize) {
+    if !self.config.debug_trace_enabled() {
+      return;
+    }
+    let info = SerializationDebugInfo::new(manifest.to_string(), Self::clamp_size(size_bytes));
+    let event = SerializationEvent::new(field_path_hash, SerializationEventKind::DebugTrace(info));
     self.publish(event);
   }
 }

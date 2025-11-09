@@ -12,7 +12,10 @@ use super::{
   external_serializer_policy::ExternalSerializerPolicy, field_node::FieldNode,
   serialization_telemetry::SerializationTelemetry, type_binding::TypeBinding,
 };
-use crate::RuntimeToolbox;
+use crate::{
+  RuntimeToolbox,
+  event_stream::SerializationFallbackReason,
+};
 
 #[cfg(test)]
 mod tests;
@@ -98,13 +101,17 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
         telemetry.record_latency(field_hash, Duration::ZERO);
         return Err(error);
       }
+      // TODO: RuntimeToolbox が実測時間を返せるようになったらここで取得した Duration を渡す。
       telemetry.record_success(field_hash);
+      telemetry.record_debug_trace(field_hash, payload.manifest(), payload.raw_bytes().len());
       telemetry.record_latency(field_hash, Duration::ZERO);
     }
     builder.finalize()
   }
 
   fn serialize_field(&self, node: &FieldNode, field_value: FieldValueRef) -> Result<FieldPayload, SerializationError> {
+    let telemetry = &*self.telemetry;
+    let field_hash = node.path_hash();
     if let Some(schema) = self.registry.load_schema_by_id(node.type_id()) {
       let accessors = self
         .registry
@@ -120,11 +127,24 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
       match self.registry.find_binding_by_id(node.type_id(), node.type_name()) {
         | Ok(binding) => {
           let bytes = binding.serializer().serialize_erased(field_value.as_erased())?;
-          Ok(FieldPayload::new(bytes, binding.manifest().to_string(), binding.serializer_id(), node.path_hash()))
+          Ok(FieldPayload::new(bytes, binding.manifest().to_string(), binding.serializer_id(), field_hash))
         },
         | Err(SerializationError::NoSerializerForType(_)) => {
-          self.policy.enforce(node)?;
-          self.serialize_field_external(node, field_value)
+          telemetry.record_fallback(field_hash, SerializationFallbackReason::MissingSerializer);
+          if let Err(error) = self.policy.enforce(node) {
+            telemetry.record_fallback(field_hash, SerializationFallbackReason::ExternalNotAllowed);
+            return Err(error);
+          }
+          match self.serialize_field_external(node, field_value) {
+            | Ok(payload) => {
+              telemetry.record_external_success(field_hash);
+              Ok(payload)
+            },
+            | Err(error) => {
+              telemetry.record_external_failure(field_hash, &error);
+              Err(error)
+            },
+          }
         },
         | Err(other) => Err(other),
       }

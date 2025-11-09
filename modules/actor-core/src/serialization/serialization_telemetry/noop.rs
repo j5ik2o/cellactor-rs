@@ -2,7 +2,7 @@
 
 use core::time::Duration;
 
-use crate::serialization::{FieldPathHash, SerializationError};
+use crate::{event_stream::SerializationFallbackReason, serialization::{FieldPathHash, SerializationError}};
 
 use super::SerializationTelemetry;
 
@@ -27,4 +27,12 @@ impl SerializationTelemetry for NoopSerializationTelemetry {
   fn record_success(&self, _field_path_hash: FieldPathHash) {}
 
   fn record_failure(&self, _field_path_hash: FieldPathHash, _error: &SerializationError) {}
+
+  fn record_fallback(&self, _field_path_hash: FieldPathHash, _reason: SerializationFallbackReason) {}
+
+  fn record_external_success(&self, _field_path_hash: FieldPathHash) {}
+
+  fn record_external_failure(&self, _field_path_hash: FieldPathHash, _error: &SerializationError) {}
+
+  fn record_debug_trace(&self, _field_path_hash: FieldPathHash, _manifest: &str, _size_bytes: usize) {}
 }

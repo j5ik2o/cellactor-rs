@@ -22,7 +22,7 @@ use crate::{
   actor_prim::{ActorCellGeneric, ActorPath, Pid, actor_ref::ActorRefGeneric},
   dead_letter::{DeadLetterEntryGeneric, DeadLetterGeneric, DeadLetterReason},
   error::{ActorError, SendError},
-  event_stream::{EventStreamEvent, EventStreamGeneric, SerializationAuditEvent},
+  event_stream::{EventStreamEvent, EventStreamGeneric, SerializationAuditEvent, SerializationEvent},
   futures::ActorFuture,
   logging::{LogEvent, LogLevel},
   messaging::{AnyMessageGeneric, FailurePayload, SystemMessage},
@@ -71,6 +71,7 @@ pub struct SystemStateGeneric<TB: RuntimeToolbox + 'static> {
   extensions: ToolboxMutex<HashMap<TypeId, ArcShared<dyn Any + Send + Sync + 'static>>, TB>,
   serialization_audit_enabled: AtomicBool,
   last_serialization_audit: ToolboxMutex<Option<SerializationAuditEvent>, TB>,
+  last_serialization_binding_error: ToolboxMutex<Option<SerializationEvent>, TB>,
   audit_notifier: ToolboxMutex<ArcShared<dyn SerializationAuditNotifier<TB>>, TB>,
 }
 
@@ -110,6 +111,7 @@ impl<TB: RuntimeToolbox + 'static> SystemStateGeneric<TB> {
       extensions: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
       serialization_audit_enabled: AtomicBool::new(true),
       last_serialization_audit: <TB::MutexFamily as SyncMutexFamily>::create(None),
+      last_serialization_binding_error: <TB::MutexFamily as SyncMutexFamily>::create(None),
       audit_notifier: <TB::MutexFamily as SyncMutexFamily>::create(ArcShared::new(
         NoopSerializationAuditNotifier::new(),
       )),
@@ -414,6 +416,17 @@ impl<TB: RuntimeToolbox + 'static> SystemStateGeneric<TB> {
   #[must_use]
   pub(crate) fn last_serialization_audit(&self) -> Option<SerializationAuditEvent> {
     self.last_serialization_audit.lock().clone()
+  }
+
+  /// Records the most recent serialization binding error event.
+  pub(crate) fn record_serialization_binding_error(&self, event: &SerializationEvent) {
+    *self.last_serialization_binding_error.lock() = Some(event.clone());
+  }
+
+  /// Returns the last recorded serialization binding error event, if any.
+  #[must_use]
+  pub(crate) fn last_serialization_binding_error(&self) -> Option<SerializationEvent> {
+    self.last_serialization_binding_error.lock().clone()
   }
 
   /// Emits a log event via the event stream.

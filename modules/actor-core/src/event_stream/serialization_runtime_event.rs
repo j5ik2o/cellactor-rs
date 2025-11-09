@@ -1,5 +1,6 @@
 //! Runtime serialization telemetry event structures.
 
+use alloc::string::String;
 use core::fmt;
 
 use crate::serialization::FieldPathHash;
@@ -40,6 +41,46 @@ pub enum SerializationEventKind {
   Failure(SerializationFailureKind),
   /// Field serialization latency observation (microseconds).
   Latency(u64),
+  /// Serialization fell back to a secondary path.
+  Fallback(SerializationFallbackReason),
+  /// Debug trace entry containing manifest and size.
+  DebugTrace(SerializationDebugInfo),
+}
+
+/// Reasons explaining why the orchestrator entered a fallback path.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SerializationFallbackReason {
+  /// No serializer binding was registered for the field type.
+  MissingSerializer,
+  /// External serializers are not allowed for the field path.
+  ExternalNotAllowed,
+}
+
+/// Additional context published when debug tracing is enabled.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SerializationDebugInfo {
+  manifest:   String,
+  size_bytes: u32,
+}
+
+impl SerializationDebugInfo {
+  /// Creates a new debug entry using the provided manifest and payload size.
+  #[must_use]
+  pub fn new(manifest: String, size_bytes: u32) -> Self {
+    Self { manifest, size_bytes }
+  }
+
+  /// Returns the serialized manifest associated with the field.
+  #[must_use]
+  pub fn manifest(&self) -> &str {
+    &self.manifest
+  }
+
+  /// Returns the payload size in bytes.
+  #[must_use]
+  pub const fn size_bytes(&self) -> u32 {
+    self.size_bytes
+  }
 }
 
 /// Canonical failure reasons surfaced through telemetry events.
