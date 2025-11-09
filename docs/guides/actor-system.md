@@ -53,6 +53,14 @@ while !termination.is_ready() {
 ## 4. 監視とオブザーバビリティ
 
 - **EventStream**: ライフサイクル・ログ・Deadletter を publish するバスです。`system.subscribe_event_stream(subscriber)` で購読し、`on_event` で各種イベントを処理します。既定バッファ容量は 256 件で、超過すると最古のイベントから破棄されます。
+  - 将来的な最適化案: 購読者が 0 件の間はリングバッファを未確保（もしくは破棄）しておき、初回 `subscribe` や `publish` 時に遅延確保する。購読者が再び 0 件になった時点でバッファを `None` に戻すことで、イベント監視を一時停止している期間のメモリ常駐コストを解消できる。
+  - Mailbox改善案: 既存の `QueueHandles` に `PriorityQueue` サポートを追加し、`PriorityMessage` を実装したユーザメッセージは Protoactor/Pekko 同様に優先順位付きで処理する。`MailboxPolicy` へ優先度レイヤーや制御メッセージ専用キューの指定を追加し、no_std 制約を守りつつミドルウェア/計測との連携を強化する。
+  - ランタイム構造改善案:
+    - `SystemStateGeneric` が PID 配番・名前解決・ガーディアン・EventStream・DeadLetter・AskFuture・失敗統計を一括保持しておりロック競合が目立つため、Registry/GuardianState/Eventing/FailureMetrics 等へ分割し、それぞれ `ArcShared` で ActorSystem に保持させる。（`modules/actor-core/src/system/system_state.rs`）
+    - Mailbox 計測フックを `ToolboxMutex<Option<...>>` ではなく lock-free 参照（例: `AtomicPtr<Option<ArcShared<_>>>`）に変更し、未設定時は即 return する fast path を用意して enqueue/dequeue のホットパスを軽量化する。（`modules/actor-core/src/mailbox/base.rs`）
+    - DeadLetter を `VecDeque`/`VecRingBackend` に置き換え、容量超過時も `drain` で O(n) にならないリングバッファ構造にして大量ドロップ時の clone/shrink を防ぐ。（`modules/actor-core/src/dead_letter/dead_letter_impl.rs`）
+    - `Props` の middleware を文字列列挙から `ArcShared<dyn MessageInvokerMiddleware>` へ昇格させる `MiddlewareRegistry`（または DI フック）を追加し、Invoker パイプラインが名前解決に依存せず実体を束ねられるようにする。（`modules/actor-core/src/props/base.rs`, `modules/actor-core/src/messaging/message_invoker/pipeline.rs`）
+    - `ChildRefGeneric` が内部 `SystemState` を直接握って SystemMessage を送らないように、公開 API は Dispatcher/Guardian 経由のインターフェイスにファサード化しシステム実装から分離する。（`modules/actor-core/src/actor_prim/child_ref.rs`）
 - **Deadletter**: 未配達メッセージを 512 件保持し、登録時に `EventStreamEvent::Deadletter` と `LogEvent` を発火します。容量変更が必要な場合は今後追加予定の `actor-std` ヘルパー（ActorSystemConfig 仮称）での設定を検討します。
 - **LoggerSubscriber**: `LogLevel` フィルタ付きで EventStream を購読し、UART/RTT やホストログへ転送します。Deadletter が 75% に達したなどの警告閾値を購読者側で判断し、任意の通知手段へ連携してください。
 

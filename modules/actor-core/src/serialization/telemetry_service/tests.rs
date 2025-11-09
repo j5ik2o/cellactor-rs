@@ -35,7 +35,11 @@ fn telemetry_service_emits_success_event() {
 fn telemetry_service_emits_failure_event() {
   let fixture = TelemetryFixture::new(TelemetryConfig::default());
 
-  SerializationTelemetry::record_failure(&fixture.telemetry, 22u128, &SerializationError::NoSerializerForType("Example"));
+  SerializationTelemetry::record_failure(
+    &fixture.telemetry,
+    22u128,
+    &SerializationError::NoSerializerForType("Example"),
+  );
 
   let events = fixture.events();
   assert!(matches!(
@@ -67,11 +71,7 @@ fn telemetry_service_applies_latency_threshold() {
 fn telemetry_service_emits_fallback_event_and_deadletter() {
   let fixture = TelemetryFixture::new(TelemetryConfig::default());
 
-  SerializationTelemetry::record_fallback(
-    &fixture.telemetry,
-    77u128,
-    SerializationFallbackReason::ExternalNotAllowed,
-  );
+  SerializationTelemetry::record_fallback(&fixture.telemetry, 77u128, SerializationFallbackReason::ExternalNotAllowed);
 
   let events = fixture.events();
   assert!(events.iter().any(|stream_event| matches!(
@@ -91,7 +91,11 @@ fn telemetry_counters_track_all_paths() {
   let fixture = TelemetryFixture::new(TelemetryConfig::default());
 
   SerializationTelemetry::record_success(&fixture.telemetry, 1u128);
-  SerializationTelemetry::record_failure(&fixture.telemetry, 2u128, &SerializationError::SerializationFailed("boom".into()));
+  SerializationTelemetry::record_failure(
+    &fixture.telemetry,
+    2u128,
+    &SerializationError::SerializationFailed("boom".into()),
+  );
   SerializationTelemetry::record_external_success(&fixture.telemetry, 3u128);
   SerializationTelemetry::record_external_failure(
     &fixture.telemetry,
@@ -156,9 +160,9 @@ impl EventStreamSubscriber<NoStdToolbox> for RecordingSubscriber {
 }
 
 struct TelemetryFixture {
-  state:        ArcShared<SystemStateGeneric<NoStdToolbox>>,
-  telemetry:    TelemetryService<NoStdToolbox>,
-  subscriber:   ArcShared<RecordingSubscriber>,
+  state:         ArcShared<SystemStateGeneric<NoStdToolbox>>,
+  telemetry:     TelemetryService<NoStdToolbox>,
+  subscriber:    ArcShared<RecordingSubscriber>,
   _subscription: EventStreamSubscription,
 }
 

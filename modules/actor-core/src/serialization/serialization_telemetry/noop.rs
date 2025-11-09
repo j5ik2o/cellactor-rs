@@ -2,9 +2,11 @@
 
 use core::time::Duration;
 
-use crate::{event_stream::SerializationFallbackReason, serialization::{FieldPathHash, SerializationError}};
-
 use super::SerializationTelemetry;
+use crate::{
+  event_stream::SerializationFallbackReason,
+  serialization::{FieldPathHash, SerializationError},
+};
 
 /// Telemetry handler that discards all events.
 pub struct NoopSerializationTelemetry;

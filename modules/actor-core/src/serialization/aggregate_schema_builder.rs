@@ -53,8 +53,7 @@ impl<T: Any + Send + Sync + 'static> AggregateSchemaBuilder<T> {
   ) -> Result<&mut Self, SerializationError>
   where
     F: Serialize + Any + Send + Sync + 'static,
-    Accessor: for<'a> Fn(&'a T) -> &'a F + Send + Sync + 'static,
-  {
+    Accessor: for<'a> Fn(&'a T) -> &'a F + Send + Sync + 'static, {
     if display.len() > super::constants::MAX_FIELD_PATH_BYTES {
       return Err(SerializationError::InvalidAggregateSchema("field path display exceeds maximum length"));
     }
@@ -108,8 +107,7 @@ impl<T: Any + Send + Sync + 'static> AggregateSchemaBuilder<T> {
   ) -> Result<&mut Self, SerializationError>
   where
     F: Serialize + Any + Send + Sync + 'static,
-    Accessor: for<'a> Fn(&'a T) -> &'a F + Send + Sync + 'static,
-  {
+    Accessor: for<'a> Fn(&'a T) -> &'a F + Send + Sync + 'static, {
     self.add_field::<F, _>(
       path,
       display,

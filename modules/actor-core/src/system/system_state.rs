@@ -3,7 +3,12 @@
 #[cfg(test)]
 mod tests;
 
-use alloc::{borrow::ToOwned, format, string::{String, ToString}, vec::Vec};
+use alloc::{
+  borrow::ToOwned,
+  format,
+  string::{String, ToString},
+  vec::Vec,
+};
 use core::{
   any::{Any, TypeId},
   time::Duration,

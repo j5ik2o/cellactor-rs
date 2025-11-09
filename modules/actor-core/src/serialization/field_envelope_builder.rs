@@ -5,10 +5,7 @@ use alloc::{string::String, vec::Vec as AllocVec};
 use heapless::Vec;
 
 use super::{
-  bytes::Bytes,
-  constants::MAX_FIELDS_PER_AGGREGATE,
-  error::SerializationError,
-  field_payload::FieldPayload,
+  bytes::Bytes, constants::MAX_FIELDS_PER_AGGREGATE, error::SerializationError, field_payload::FieldPayload,
   payload::SerializedPayload,
 };
 
@@ -43,7 +40,8 @@ impl FieldEnvelopeBuilder {
   pub fn finalize(self) -> Result<SerializedPayload, SerializationError> {
     let mut buffer = AllocVec::new();
     buffer.extend_from_slice(&ENVELOPE_MAGIC);
-    let count = u16::try_from(self.fields.len()).map_err(|_| SerializationError::SerializationFailed("field count overflow".into()))?;
+    let count = u16::try_from(self.fields.len())
+      .map_err(|_| SerializationError::SerializationFailed("field count overflow".into()))?;
     buffer.extend_from_slice(&count.to_le_bytes());
 
     for field in self.fields.iter() {
@@ -57,7 +55,8 @@ impl FieldEnvelopeBuilder {
       buffer.extend_from_slice(manifest_bytes);
 
       let field_bytes = field.raw_bytes();
-      let payload_len = u32::try_from(field_bytes.len()).map_err(|_| SerializationError::SerializationFailed("payload too large".into()))?;
+      let payload_len = u32::try_from(field_bytes.len())
+        .map_err(|_| SerializationError::SerializationFailed("payload too large".into()))?;
       buffer.extend_from_slice(&payload_len.to_le_bytes());
       buffer.extend_from_slice(field_bytes.as_ref());
     }

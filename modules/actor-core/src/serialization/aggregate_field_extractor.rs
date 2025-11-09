@@ -4,7 +4,7 @@ use core::{any::Any, marker::PhantomData};
 
 use serde::Serialize;
 
-use super::{field_value_ref::FieldValueRef, error::SerializationError};
+use super::{error::SerializationError, field_value_ref::FieldValueRef};
 
 /// Extracts a single field value from an aggregate instance.
 pub trait AggregateFieldExtractor: Send + Sync {
@@ -17,8 +17,7 @@ pub(super) struct TypedFieldExtractor<T, F, Accessor>
 where
   T: Any + Send + Sync + 'static,
   F: Serialize + Any + Send + Sync + 'static,
-  Accessor: for<'a> Fn(&'a T) -> &'a F + Send + Sync + 'static,
-{
+  Accessor: for<'a> Fn(&'a T) -> &'a F + Send + Sync + 'static, {
   accessor: Accessor,
   _marker:  PhantomData<(T, F)>,
 }
@@ -43,9 +42,8 @@ where
   Accessor: for<'a> Fn(&'a T) -> &'a F + Send + Sync + 'static,
 {
   fn extract<'a>(&self, root: &'a dyn Any) -> Result<FieldValueRef<'a>, SerializationError> {
-    let typed = root
-      .downcast_ref::<T>()
-      .ok_or(SerializationError::InvalidAggregateValue(core::any::type_name::<T>()))?;
+    let typed =
+      root.downcast_ref::<T>().ok_or(SerializationError::InvalidAggregateValue(core::any::type_name::<T>()))?;
     Ok(FieldValueRef::new((self.accessor)(typed)))
   }
 }

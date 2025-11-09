@@ -10,8 +10,8 @@ use super::{
   telemetry_counters::TelemetryCounters,
 };
 use crate::{
-  dead_letter::DeadLetterReason,
   RuntimeToolbox,
+  dead_letter::DeadLetterReason,
   event_stream::{
     EventStreamEvent, SerializationDebugInfo, SerializationEvent, SerializationEventKind, SerializationFailureKind,
     SerializationFallbackReason,
@@ -50,26 +50,16 @@ impl<TB: RuntimeToolbox + 'static> TelemetryService<TB> {
   }
 
   fn publish(&self, event: SerializationEvent) {
-    self
-      .system_state
-      .publish_event(&EventStreamEvent::Serialization(event));
+    self.system_state.publish_event(&EventStreamEvent::Serialization(event));
   }
 
   fn to_micros(elapsed: Duration) -> u64 {
     let micros = elapsed.as_micros();
-    if micros > u64::MAX as u128 {
-      u64::MAX
-    } else {
-      micros as u64
-    }
+    if micros > u64::MAX as u128 { u64::MAX } else { micros as u64 }
   }
 
   fn clamp_size(size_bytes: usize) -> u32 {
-    if size_bytes > u32::MAX as usize {
-      u32::MAX
-    } else {
-      size_bytes as u32
-    }
+    if size_bytes > u32::MAX as usize { u32::MAX } else { size_bytes as u32 }
   }
 
   fn failure_kind(error: &SerializationError) -> SerializationFailureKind {

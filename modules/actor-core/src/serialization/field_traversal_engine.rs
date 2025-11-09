@@ -5,11 +5,8 @@ use core::cmp::Ordering;
 use heapless::Vec;
 
 use super::{
-  aggregate_schema::AggregateSchema,
-  constants::MAX_FIELDS_PER_AGGREGATE,
-  error::SerializationError,
-  field_node::FieldNode,
-  traversal_policy::TraversalPolicy,
+  aggregate_schema::AggregateSchema, constants::MAX_FIELDS_PER_AGGREGATE, error::SerializationError,
+  field_node::FieldNode, traversal_policy::TraversalPolicy,
 };
 
 #[cfg(test)]
@@ -61,14 +58,10 @@ impl FieldTraversalEngine {
 
 fn compare(policy: TraversalPolicy, lhs: &FieldNode, rhs: &FieldNode) -> Ordering {
   match policy {
-    TraversalPolicy::DepthFirst => compare_depth_first(lhs, rhs),
-    TraversalPolicy::BreadthFirst => {
+    | TraversalPolicy::DepthFirst => compare_depth_first(lhs, rhs),
+    | TraversalPolicy::BreadthFirst => {
       let depth_cmp = lhs.path().segments().len().cmp(&rhs.path().segments().len());
-      if depth_cmp == Ordering::Equal {
-        compare_depth_first(lhs, rhs)
-      } else {
-        depth_cmp
-      }
+      if depth_cmp == Ordering::Equal { compare_depth_first(lhs, rhs) } else { depth_cmp }
     },
   }
 }

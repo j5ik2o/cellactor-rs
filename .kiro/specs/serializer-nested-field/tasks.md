@@ -90,20 +90,20 @@ graph TD
   - 完了条件: デバッグモード切替テストが追加され、監視 API でバインディングエラーの詳細が確認できる。
   - _Requirements: R3.AC4, R3.AC5_
 
-- [ ] 4. テスト・検証・性能確認
+- [x] 4. テスト・検証・性能確認
   - Registry/Traversal/Envelope/Telemetry 各層でユニットテストを作成し、Pekko 参照ベクタとの比較や `external_serializer_allowed` の制約を自動化する。
   - ActorSystem 起動～Telemetry 連携までの統合テストを用意し、循環検知・DeadLetter/Telemetry イベント・外部委譲許可/拒否シナリオをカバーする。
   - 最大深さや 10k msg/s 負荷など性能試験を追加し、レイテンシ閾値やカウンタ飽和が要件内に収まることを確認し、CI スイートでの自動実行を追加する。
   - 完了条件: 新規テスト群が CI の標準ターゲット（fmt/clippy/test）とパフォーマンスジョブでグリーンになる。
   - _Requirements: R1.AC1-R1.AC7, R2.AC1-R2.AC6, R3.AC1-R3.AC6_
 
-- [ ] 4.1 ユニットテスト整備
+- [x] 4.1 ユニットテスト整備
   - FieldTraversalEngine が DFS/BFS 指定に応じて順序を切り替え、各ノードが期待する Serializer/manifest を返すか検証する。
   - ExternalSerializerPolicy・AggregateSchemaBuilder が純粋値型判定や循環検知を適切に行うかテストし、`PekkoSerializable` 割当と衝突エラーを確認する。
   - FieldEnvelopeBuilder が Pekko ベクタとバイト列一致すること、`FieldPayload` 以外を受け取らないことを確認する。
   - _Requirements: R1.AC1-R1.AC5, R2.AC1-R2.AC4, R2.AC6_
 
-- [ ] 4.2 統合・観測テスト
+- [x] 4.2 統合・観測テスト
   - Schema 登録済み ActorSystem で serialize→deserialize を往復し、Telemetry イベントと DeadLetter 通知をアサートする統合テストを作成する。
   - Bootstrap 失敗シナリオ（循環、欠落、禁止外部委譲）が Telemetry/監視 API に流れることを確認し、外部委譲許可シナリオで成功イベントが増えることを検証する。
   - _Requirements: R1.AC4-R1.AC7, R2.AC2-R2.AC5, R3.AC2-R3.AC5_

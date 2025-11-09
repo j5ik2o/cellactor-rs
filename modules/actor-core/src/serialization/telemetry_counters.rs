@@ -4,8 +4,8 @@ use portable_atomic::{AtomicU64, Ordering};
 
 /// Aggregated success/failure counters exposed via telemetry.
 pub struct TelemetryCounters {
-  success_total: AtomicU64,
-  failure_total: AtomicU64,
+  success_total:          AtomicU64,
+  failure_total:          AtomicU64,
   external_success_total: AtomicU64,
   external_failure_total: AtomicU64,
 }
@@ -15,8 +15,8 @@ impl TelemetryCounters {
   #[must_use]
   pub const fn new() -> Self {
     Self {
-      success_total: AtomicU64::new(0),
-      failure_total: AtomicU64::new(0),
+      success_total:          AtomicU64::new(0),
+      failure_total:          AtomicU64::new(0),
       external_success_total: AtomicU64::new(0),
       external_failure_total: AtomicU64::new(0),
     }

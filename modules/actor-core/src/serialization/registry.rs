@@ -34,12 +34,12 @@ mod tests;
 
 /// Stores serializers and type bindings for a given actor system.
 pub struct SerializerRegistry<TB: RuntimeToolbox + 'static> {
-  serializers:       ToolboxMutex<HashMap<u32, SerializerHandle>, TB>,
-  type_bindings:     ToolboxMutex<HashMap<TypeId, ArcShared<TypeBinding>>, TB>,
-  manifest_bindings: ToolboxMutex<HashMap<ManifestKey, ArcShared<TypeBinding>>, TB>,
-  aggregate_schemas: ToolboxMutex<HashMap<TypeId, ArcShared<AggregateSchema>>, TB>,
-  aggregate_accessors: ToolboxMutex<HashMap<TypeId, ArcShared<AggregateAccessors>>, TB>,
-  field_policies:    ToolboxMutex<HashMap<FieldPathHash, ExternalSerializerPolicyEntry>, TB>,
+  serializers:              ToolboxMutex<HashMap<u32, SerializerHandle>, TB>,
+  type_bindings:            ToolboxMutex<HashMap<TypeId, ArcShared<TypeBinding>>, TB>,
+  manifest_bindings:        ToolboxMutex<HashMap<ManifestKey, ArcShared<TypeBinding>>, TB>,
+  aggregate_schemas:        ToolboxMutex<HashMap<TypeId, ArcShared<AggregateSchema>>, TB>,
+  aggregate_accessors:      ToolboxMutex<HashMap<TypeId, ArcShared<AggregateAccessors>>, TB>,
+  field_policies:           ToolboxMutex<HashMap<FieldPathHash, ExternalSerializerPolicyEntry>, TB>,
   pekko_assignment_success: AtomicU64,
   pekko_assignment_failure: AtomicU64,
 }
@@ -55,12 +55,12 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
   #[must_use]
   pub fn new() -> Self {
     Self {
-      serializers:       <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
-      type_bindings:     <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
-      manifest_bindings: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
-      aggregate_schemas: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
-      aggregate_accessors: <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
-      field_policies:    <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      serializers:              <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      type_bindings:            <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      manifest_bindings:        <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      aggregate_schemas:        <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      aggregate_accessors:      <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
+      field_policies:           <TB::MutexFamily as SyncMutexFamily>::create(HashMap::new()),
       pekko_assignment_success: AtomicU64::new(0),
       pekko_assignment_failure: AtomicU64::new(0),
     }
@@ -157,12 +157,7 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
     type_id: TypeId,
     type_name: &'static str,
   ) -> Result<ArcShared<TypeBinding>, SerializationError> {
-    self
-      .type_bindings
-      .lock()
-      .get(&type_id)
-      .cloned()
-      .ok_or(SerializationError::NoSerializerForType(type_name))
+    self.type_bindings.lock().get(&type_id).cloned().ok_or(SerializationError::NoSerializerForType(type_name))
   }
 
   /// Finds a binding by manifest.
@@ -207,11 +202,11 @@ impl<TB: RuntimeToolbox + 'static> SerializerRegistry<TB> {
       T::pekko_manifest().map(|value| value.to_string()).unwrap_or_else(|| core::any::type_name::<T>().to_string());
 
     match self.bind_type::<T, _>(&serializer, Some(manifest_value), T::pekko_decode) {
-      Ok(()) => {
+      | Ok(()) => {
         self.pekko_assignment_success.fetch_add(1, Ordering::Relaxed);
         Ok(())
       },
-      Err(error) => {
+      | Err(error) => {
         self.pekko_assignment_failure.fetch_add(1, Ordering::Relaxed);
         Err(error)
       },

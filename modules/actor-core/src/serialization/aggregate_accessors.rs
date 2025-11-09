@@ -6,9 +6,7 @@ use cellactor_utils_core_rs::sync::ArcShared;
 use heapless::Vec;
 
 use super::{
-  aggregate_field_extractor::AggregateFieldExtractor,
-  constants::MAX_FIELDS_PER_AGGREGATE,
-  error::SerializationError,
+  aggregate_field_extractor::AggregateFieldExtractor, constants::MAX_FIELDS_PER_AGGREGATE, error::SerializationError,
   field_value_ref::FieldValueRef,
 };
 
@@ -21,8 +19,7 @@ pub struct AggregateAccessors {
 
 impl fmt::Debug for AggregateAccessors {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f
-      .debug_struct("AggregateAccessors")
+    f.debug_struct("AggregateAccessors")
       .field("root_type", &self.root_type)
       .field("len", &self.extractors.len())
       .finish()
@@ -59,7 +56,11 @@ impl AggregateAccessors {
   }
 
   /// Extracts the field value for the specified index.
-  pub fn extract<'a>(&self, index: usize, root: &'a dyn core::any::Any) -> Result<FieldValueRef<'a>, SerializationError> {
+  pub fn extract<'a>(
+    &self,
+    index: usize,
+    root: &'a dyn core::any::Any,
+  ) -> Result<FieldValueRef<'a>, SerializationError> {
     self
       .extractors
       .get(index)

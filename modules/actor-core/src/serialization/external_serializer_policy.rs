@@ -59,3 +59,6 @@ impl<TB: RuntimeToolbox + 'static> ExternalSerializerPolicy<TB> {
     }
   }
 }
+
+#[cfg(test)]
+mod tests;

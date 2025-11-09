@@ -1,4 +1,7 @@
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+  string::{String, ToString},
+  vec::Vec,
+};
 
 use cellactor_utils_core_rs::sync::ArcShared;
 
@@ -25,7 +28,7 @@ struct Leaf(u32);
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 struct EnvelopeAggregate {
-  first: Leaf,
+  first:  Leaf,
   second: Leaf,
 }
 

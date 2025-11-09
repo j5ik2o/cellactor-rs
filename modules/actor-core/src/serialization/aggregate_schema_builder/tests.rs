@@ -1,10 +1,5 @@
 use crate::serialization::{
-  AggregateSchemaBuilder,
-  FieldPath,
-  FieldPathDisplay,
-  FieldPathSegment,
-  TraversalPolicy,
-  error::SerializationError,
+  AggregateSchemaBuilder, FieldPath, FieldPathDisplay, FieldPathSegment, TraversalPolicy, error::SerializationError,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -14,6 +9,18 @@ struct ChildAggregate(u32);
 struct ParentAggregate {
   child: ChildAggregate,
   count: u32,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+struct NonPure(u32);
+
+impl Drop for NonPure {
+  fn drop(&mut self) {}
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+struct ImpureAggregate {
+  value: NonPure,
 }
 
 #[test]
@@ -61,4 +68,21 @@ fn finish_fails_when_no_fields() {
   );
   let err = builder.finish().expect_err("should fail");
   assert!(matches!(err, SerializationError::InvalidAggregateSchema(_)));
+}
+
+#[test]
+fn external_serializer_requires_pure_value() {
+  let mut builder = AggregateSchemaBuilder::<ImpureAggregate>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("impure").expect("display"),
+  );
+  let err = builder
+    .add_value_field::<NonPure, _>(
+      FieldPath::from_segments(&[FieldPathSegment::new(0)]).expect("path"),
+      FieldPathDisplay::from_str("impure.value").expect("display"),
+      true,
+      |aggregate| &aggregate.value,
+    )
+    .expect_err("non pure value must fail");
+  assert!(matches!(err, SerializationError::InvalidAggregateSchema(message) if message.contains("pure value")));
 }

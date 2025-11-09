@@ -28,6 +28,11 @@ struct EnvelopeAggregate {
   second: Leaf,
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+struct DeepAggregate {
+  leaf: Leaf,
+}
+
 fn decode_leaf(bytes: &[u8]) -> Result<Leaf, SerializationError> {
   bincode::serde::decode_from_slice(bytes, bincode::config::standard().with_fixed_int_encoding())
     .map(|(value, _)| value)
@@ -40,10 +45,14 @@ fn decode_envelope(bytes: &[u8]) -> Result<EnvelopeAggregate, SerializationError
     .map_err(|error| SerializationError::DeserializationFailed(error.to_string()))
 }
 
+fn decode_deep_aggregate(bytes: &[u8]) -> Result<DeepAggregate, SerializationError> {
+  bincode::serde::decode_from_slice(bytes, bincode::config::standard().with_fixed_int_encoding())
+    .map(|(value, _)| value)
+    .map_err(|error| SerializationError::DeserializationFailed(error.to_string()))
+}
+
 fn encoded_leaf_len(value: &Leaf) -> usize {
-  bincode::serde::encode_to_vec(value, bincode::config::standard().with_fixed_int_encoding())
-    .expect("encode")
-    .len()
+  bincode::serde::encode_to_vec(value, bincode::config::standard().with_fixed_int_encoding()).expect("encode").len()
 }
 
 #[test]
@@ -97,16 +106,18 @@ fn orchestrator_notifies_telemetry_hooks() {
   let _ = orchestrator.serialize(&aggregate).expect("serialize");
   let first_size = encoded_leaf_len(&aggregate.first);
   let second_size = encoded_leaf_len(&aggregate.second);
+  let first_latency = Duration::from_micros(first_size as u64);
+  let second_latency = Duration::from_micros(second_size as u64);
 
   let events = telemetry.snapshot();
   assert_eq!(events, vec![
     TelemetryCall::AggregateStart,
     TelemetryCall::FieldSuccess(hashes[0]),
     TelemetryCall::FieldDebugTrace(hashes[0], String::from("leaf"), first_size),
-    TelemetryCall::FieldLatency(hashes[0], Duration::ZERO),
+    TelemetryCall::FieldLatency(hashes[0], first_latency),
     TelemetryCall::FieldSuccess(hashes[1]),
     TelemetryCall::FieldDebugTrace(hashes[1], String::from("leaf"), second_size),
-    TelemetryCall::FieldLatency(hashes[1], Duration::ZERO),
+    TelemetryCall::FieldLatency(hashes[1], second_latency),
     TelemetryCall::AggregateFinish,
   ]);
 }
@@ -181,6 +192,7 @@ fn orchestrator_reports_external_telemetry_events() {
   let _ = orchestrator.serialize(&aggregate).expect("serialize");
 
   let leaf_size = encoded_leaf_len(&aggregate.first);
+  let latency = Duration::from_micros(leaf_size as u64);
   let events = telemetry.snapshot();
   assert_eq!(events, vec![
     TelemetryCall::AggregateStart,
@@ -188,9 +200,28 @@ fn orchestrator_reports_external_telemetry_events() {
     TelemetryCall::ExternalSuccess(hash),
     TelemetryCall::FieldSuccess(hash),
     TelemetryCall::FieldDebugTrace(hash, core::any::type_name::<Leaf>().to_string(), leaf_size),
-    TelemetryCall::FieldLatency(hash, Duration::ZERO),
+    TelemetryCall::FieldLatency(hash, latency),
     TelemetryCall::AggregateFinish,
   ]);
+}
+
+#[test]
+fn orchestrator_serializes_field_with_max_depth_path() {
+  const DEPTH: usize = 32;
+  let registry = ArcShared::new(SerializerRegistry::<NoStdToolbox>::new());
+  let handle = SerializerHandle::new(BincodeSerializer::new());
+  registry.register_serializer(handle.clone()).expect("register handle");
+  registry.bind_type::<Leaf, _>(&handle, Some("leaf".into()), decode_leaf).expect("bind leaf");
+  registry.bind_type::<DeepAggregate, _>(&handle, Some("deep".into()), decode_deep_aggregate).expect("bind deep");
+  register_deep_schema(&registry, DEPTH);
+
+  let orchestrator =
+    NestedSerializerOrchestrator::new(registry.clone(), ArcShared::new(NoopSerializationTelemetry::new()));
+  let aggregate = DeepAggregate { leaf: Leaf(5) };
+  let payload = orchestrator.serialize(&aggregate).expect("serialize");
+
+  assert_eq!(payload.manifest(), "deep");
+  assert!(payload.bytes().len() > 0);
 }
 
 fn register_envelope_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox>>) {
@@ -215,6 +246,31 @@ fn register_envelope_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox
     )
     .expect("second");
   registry.register_aggregate_schema(builder.finish().expect("schema")).expect("register schema");
+}
+
+fn register_deep_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox>>, depth: usize) {
+  let mut builder = AggregateSchemaBuilder::<DeepAggregate>::new(
+    TraversalPolicy::DepthFirst,
+    FieldPathDisplay::from_str("deep").expect("display"),
+  );
+  let segments = build_deep_segments(depth);
+  builder
+    .add_value_field::<Leaf, _>(
+      FieldPath::from_segments(&segments).expect("path"),
+      FieldPathDisplay::from_str("deep.leaf").expect("display"),
+      false,
+      |aggregate| &aggregate.leaf,
+    )
+    .expect("field");
+  registry.register_aggregate_schema(builder.finish().expect("schema")).expect("register schema");
+}
+
+fn build_deep_segments(depth: usize) -> alloc::vec::Vec<FieldPathSegment> {
+  let mut segments = Vec::new();
+  for index in 0..depth {
+    segments.push(FieldPathSegment::new(index as u16));
+  }
+  segments
 }
 
 fn register_external_schema(registry: &ArcShared<SerializerRegistry<NoStdToolbox>>) {

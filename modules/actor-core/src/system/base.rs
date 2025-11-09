@@ -21,7 +21,9 @@ use crate::{
   futures::ActorFuture,
   logging::LogLevel,
   messaging::{AnyMessageGeneric, SystemMessage},
-  monitoring::serialization_audit_monitor::SerializationAuditMonitor,
+  monitoring::{
+    serialization_audit_monitor::SerializationAuditMonitor, serialization_runtime_monitor::SerializationRuntimeMonitor,
+  },
   props::PropsGeneric,
   serialization::SERIALIZATION_EXTENSION,
   spawn::SpawnError,
@@ -133,6 +135,12 @@ impl<TB: RuntimeToolbox + 'static> ActorSystemGeneric<TB> {
   #[must_use]
   pub fn serialization_audit_monitor(&self) -> SerializationAuditMonitor<TB> {
     SerializationAuditMonitor::new(self.state.clone())
+  }
+
+  /// Provides access to serialization runtime telemetry snapshots.
+  #[must_use]
+  pub fn serialization_runtime_monitor(&self) -> SerializationRuntimeMonitor<TB> {
+    SerializationRuntimeMonitor::new(self.state.clone())
   }
 
   /// Subscribes the provided observer to the event stream.

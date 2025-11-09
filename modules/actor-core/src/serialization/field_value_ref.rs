@@ -16,8 +16,7 @@ impl<'a> FieldValueRef<'a> {
   #[must_use]
   pub fn new<T>(value: &'a T) -> Self
   where
-    T: Serialize + Any,
-  {
+    T: Serialize + Any, {
     Self { any: value, erased: value }
   }
 

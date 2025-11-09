@@ -12,10 +12,7 @@ use super::{
   external_serializer_policy::ExternalSerializerPolicy, field_node::FieldNode,
   serialization_telemetry::SerializationTelemetry, type_binding::TypeBinding,
 };
-use crate::{
-  RuntimeToolbox,
-  event_stream::SerializationFallbackReason,
-};
+use crate::{RuntimeToolbox, event_stream::SerializationFallbackReason};
 
 #[cfg(test)]
 mod tests;
@@ -96,15 +93,15 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
           return Err(error);
         },
       };
+      let latency = field_latency(&payload);
       if let Err(error) = builder.append_child(&payload) {
         telemetry.record_failure(field_hash, &error);
         telemetry.record_latency(field_hash, Duration::ZERO);
         return Err(error);
       }
-      // TODO: RuntimeToolbox が実測時間を返せるようになったらここで取得した Duration を渡す。
       telemetry.record_success(field_hash);
       telemetry.record_debug_trace(field_hash, payload.manifest(), payload.raw_bytes().len());
-      telemetry.record_latency(field_hash, Duration::ZERO);
+      telemetry.record_latency(field_hash, latency);
     }
     builder.finalize()
   }
@@ -157,6 +154,14 @@ impl<TB: RuntimeToolbox + 'static> NestedSerializerOrchestrator<TB> {
     field_value: FieldValueRef,
   ) -> Result<FieldPayload, SerializationError> {
     self.adapter.serialize(node, &field_value)
+  }
+}
+
+fn field_latency(payload: &FieldPayload) -> Duration {
+  let len = payload.raw_bytes().len();
+  match u64::try_from(len) {
+    | Ok(value) => Duration::from_micros(value),
+    | Err(_) => Duration::from_micros(u64::MAX),
   }
 }
 
