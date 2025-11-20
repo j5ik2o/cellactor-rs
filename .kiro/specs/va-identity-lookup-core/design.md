@@ -373,6 +373,9 @@ pub trait ClusterBlocklistHook {
 ## データモデル
 - **論理**: ActivationLedger = HashMap<ClusterIdentity, ActivationLease>。PidCache = lock-free map keyed by (ClusterIdentity, NodeId)。TopologySnapshot は `ArcSwap` で最新を参照。
 - **物理**: core/no_std 層は `ToolboxMutex<HashMap<_,_>>`／`ArcShared` で shard したマップ、std 層は `dashmap` + `ArcSwap`（std 専用 crate）で lock contention を低減。Rendezvous ノードリストは `SmallVec<[ClusterNode; 8]>`。
+- **同期原則**: core/no_std 層の共有状態（ActivationLedger、PidCache shard、TopologySnapshot など）は必ず `TB::MutexFamily` が提供する `ToolboxMutex` を介してアクセスし、`std` 専用最適化（dashmap 等）は `std` モジュール内のラッパでのみ使用する。
+- **Queue 利用方針**: ClusterRuntime/PlacementActor/Context の内部キュー（Activation リクエスト、Retry 待ち、イベントバッファ等）は新規に実装せず、既存 `fraktor-utils-rs` が提供する queue/primitives を流用し、責務ごとに型 alias を定義して再利用する。
+- **再利用原則**: Remoting/ActorSystem 側に既存実装がある場合（例: EventStream 送出、Toolbox タイマ、Atomic primitive）は必ずそれらを再利用し、同機能の再発明を行わない。Cluster 拡張で新規に作るのは、既存コンポーネントに対応する機能が存在しない場合に限る。
 - **データ契約**: ClusterEvent を `EventStreamEvent::Cluster(ClusterEvent)` として Serde (std) / postcard (no_std) でシリアライズ。
 
 ## エラーハンドリング
