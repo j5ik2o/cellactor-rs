@@ -1,12 +1,18 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::string::String;
+use alloc::vec::Vec;
 use core::any::TypeId;
 use core::ptr;
 
+use fraktor_actor_rs::core::actor_prim::{Actor, ActorContextGeneric};
+use fraktor_actor_rs::core::messaging::AnyMessageViewGeneric;
+use fraktor_actor_rs::core::props::PropsGeneric;
+use fraktor_actor_rs::core::error::ActorError;
 use fraktor_utils_rs::core::runtime_toolbox::NoStdToolbox;
+use std::sync::Mutex;
 
-use crate::core::activation::{ActivationLedger, LeaseStatus};
+use crate::core::activation::{ActivationLease, ActivationLedger, ActivationRequest, ActivationResponse, LeaseId, LeaseStatus, PartitionBridge, PartitionBridgeError};
 use crate::core::config::{
     ClusterConfig, ClusterMetricsConfig, HashStrategy, RetryPolicy, TopologyStream, TopologyWatch,
 };
@@ -46,16 +52,6 @@ fn sample_config() -> ClusterConfig {
         .expect("config build")
 }
 
-fn sample_snapshot() -> TopologySnapshot {
-    TopologySnapshot::new(
-        99,
-        vec![
-            ClusterNode::new(NodeId::new("node-a"), "10.0.0.1", 1, false),
-            ClusterNode::new(NodeId::new("node-b"), "10.0.0.2", 4, false),
-        ],
-    )
-}
-
 #[test]
 fn runtime_retains_dependencies() {
     let config = sample_config();
@@ -63,7 +59,8 @@ fn runtime_retains_dependencies() {
     let activation = Arc::new(ActivationLedger::<NoStdToolbox>::new());
     let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
 
-    let runtime = ClusterRuntime::new(config.clone(), identity.clone(), activation.clone(), metrics.clone());
+    let bridge = Arc::new(TestBridge::default());
+    let runtime = ClusterRuntime::new(config.clone(), identity.clone(), activation.clone(), metrics.clone(), bridge);
 
     assert_eq!(runtime.config().system_name(), config.system_name());
     assert!(ptr::eq(Arc::as_ptr(&identity), runtime.identity() as *const _));
@@ -85,7 +82,8 @@ fn resolve_owner_acquires_lease() {
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
     let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
 
-    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics);
+    let bridge = Arc::new(TestBridge::default());
+    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge);
 
     let first = runtime
         .resolve_owner(&identity, &requester)
@@ -110,7 +108,8 @@ fn handle_blocked_node_revokes_leases() {
     identity_service.update_topology(sample_snapshot());
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
     let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
-    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics);
+    let bridge = Arc::new(TestBridge::default());
+    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge);
 
     let identity = ClusterIdentity::new("echo", "id-1");
     let requester = NodeId::new("req");
@@ -125,4 +124,65 @@ fn handle_blocked_node_revokes_leases() {
     assert_eq!(revoked[0].0, identity);
     assert!(matches!(revoked[0].1.status(), LeaseStatus::Revoked));
     assert!(ledger.get(&identity).is_none());
+}
+
+#[test]
+fn dispatches_activation_request_via_bridge() {
+    let config = sample_config();
+    let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
+    identity_service.update_topology(sample_snapshot());
+    let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
+    let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
+    let bridge = Arc::new(TestBridge::default());
+    let runtime = ClusterRuntime::new(config, identity_service, ledger, metrics, bridge.clone());
+
+    let identity = ClusterIdentity::new("echo", "req");
+    let lease = ActivationLease::new(LeaseId::new(1), NodeId::new("node-a"), 2, LeaseStatus::Active);
+    let props = PropsGeneric::<NoStdToolbox>::from_fn(|| TestActor);
+    let request = ActivationRequest::new(identity.clone(), lease, props);
+
+    runtime.dispatch_activation_request(request).expect("bridge send");
+
+    let recorded = bridge.requests.lock().unwrap();
+    assert_eq!(recorded.len(), 1);
+    assert_eq!(recorded[0], identity);
+}
+
+fn sample_snapshot() -> TopologySnapshot {
+    TopologySnapshot::new(
+        99,
+        vec![
+            ClusterNode::new(NodeId::new("node-a"), "10.0.0.1", 1, false),
+            ClusterNode::new(NodeId::new("node-b"), "10.0.0.2", 4, false),
+        ],
+    )
+}
+
+#[derive(Default)]
+struct TestBridge {
+    requests: Mutex<Vec<ClusterIdentity>>,
+    responses: Mutex<Vec<ActivationResponse>>,
+}
+
+impl PartitionBridge<NoStdToolbox> for TestBridge {
+    fn send_activation_request(&self, request: ActivationRequest<NoStdToolbox>) -> Result<(), PartitionBridgeError> {
+        self.requests.lock().unwrap().push(request.identity().clone());
+        Ok(())
+    }
+
+    fn handle_activation_response(&self, response: ActivationResponse) {
+        self.responses.lock().unwrap().push(response);
+    }
+}
+
+struct TestActor;
+
+impl Actor<NoStdToolbox> for TestActor {
+    fn receive(
+        &mut self,
+        _ctx: &mut ActorContextGeneric<'_, NoStdToolbox>,
+        _message: AnyMessageViewGeneric<'_, NoStdToolbox>,
+    ) -> Result<(), ActorError> {
+        Ok(())
+    }
 }

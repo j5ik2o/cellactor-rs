@@ -31,7 +31,7 @@
   - _依存タスク: 1.1-1.3_
   - _完了条件: 2.x 子タスク完了かつ Placement 経路の統合テストが green_
 
-- [ ] 2.1 PartitionBridge と Activation メッセージ層を構築
+- [x] 2.1 PartitionBridge と Activation メッセージ層を構築
   - ActivationRequest/ActivationResponse 型と PartitionBridge trait を実装し、既存 PartitionManager から呼び出せるようにする
   - ClusterRuntime からの resolve 結果を PartitionBridge 経由で PlacementActor へ転送する
   - _対応要件: 2.1_
