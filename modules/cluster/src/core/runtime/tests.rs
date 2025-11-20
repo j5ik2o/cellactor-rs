@@ -56,6 +56,7 @@ impl TestMetrics {
     *self.resolves.lock().unwrap()
   }
 
+  #[allow(dead_code)]
   fn timeout_count(&self) -> u32 {
     *self.timeouts.lock().unwrap()
   }
