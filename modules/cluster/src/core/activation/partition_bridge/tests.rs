@@ -34,8 +34,8 @@ impl PartitionBridge<NoStdToolbox> for RecordingBridge {
     Ok(())
   }
 
-  fn handle_activation_response(&self, response: ActivationResponse) {
-    self.responses.lock().unwrap().push(response);
+  fn handle_activation_response(&self, response: &ActivationResponse) {
+    self.responses.lock().unwrap().push(response.clone());
   }
 }
 
@@ -72,7 +72,7 @@ fn records_responses() {
   let bridge = RecordingBridge::new();
   let response =
     ActivationResponse::failure(ClusterIdentity::new("echo", "id"), ActivationError::SpawnFailed, LeaseId::new(1), 10);
-  bridge.handle_activation_response(response.clone());
+  bridge.handle_activation_response(&response);
   let responses = bridge.responses.lock().unwrap();
   assert_eq!(responses.len(), 1);
   assert_eq!(responses[0], response);

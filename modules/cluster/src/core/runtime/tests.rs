@@ -360,7 +360,7 @@ fn activation_failure_releases_lease_and_emits_event() {
     resolution.lease().topology_hash(),
   );
 
-  runtime.handle_activation_response(response).expect("handle failure");
+  runtime.handle_activation_response(&response).expect("handle failure");
 
   assert!(ledger.get(&identity).is_none());
   assert!(runtime.pid_cache().get(&identity).is_none());
@@ -431,8 +431,8 @@ impl PartitionBridge<NoStdToolbox> for TestBridge {
     Ok(())
   }
 
-  fn handle_activation_response(&self, response: ActivationResponse) {
-    self.responses.lock().unwrap().push(response);
+  fn handle_activation_response(&self, response: &ActivationResponse) {
+    self.responses.lock().unwrap().push(response.clone());
   }
 }
 

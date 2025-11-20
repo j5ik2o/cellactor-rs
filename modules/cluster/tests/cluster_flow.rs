@@ -158,8 +158,8 @@ impl PartitionBridge<NoStdToolbox> for MockBridge {
     Ok(())
   }
 
-  fn handle_activation_response(&self, response: ActivationResponse) {
-    self.responses.lock().unwrap().push(response);
+  fn handle_activation_response(&self, response: &ActivationResponse) {
+    self.responses.lock().unwrap().push(response.clone());
   }
 }
 

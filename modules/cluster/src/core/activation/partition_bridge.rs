@@ -20,5 +20,5 @@ where
   fn send_activation_request(&self, request: ActivationRequest<TB>) -> Result<(), PartitionBridgeError>;
 
   /// Publishes an activation response back to the runtime.
-  fn handle_activation_response(&self, response: ActivationResponse);
+  fn handle_activation_response(&self, response: &ActivationResponse);
 }

@@ -140,7 +140,7 @@ where
   }
 
   /// Called when topology streaming stops; keeps last snapshot and logs warning.
-  pub fn handle_topology_stream_stopped(&self) {
+  pub const fn handle_topology_stream_stopped(&self) {
     // No-op placeholder: actual logging is performed in std layer.
     // The runtime intentionally keeps current snapshot and waits for refresh.
   }
@@ -206,7 +206,11 @@ where
   }
 
   /// Processes activation response from placement.
-  pub fn handle_activation_response(&self, response: ActivationResponse) -> Result<(), ClusterError> {
+  ///
+  /// # Errors
+  ///
+  /// Returns `ClusterError` if ownership changed or runtime failure occurred.
+  pub fn handle_activation_response(&self, response: &ActivationResponse) -> Result<(), ClusterError> {
     if let Some(error) = response.error() {
       let released = self.activation.release(response.identity(), response.lease_id());
       if !released {
@@ -234,6 +238,10 @@ where
   }
 
   /// Handles termination notification for a tracked lease.
+  ///
+  /// # Errors
+  ///
+  /// Returns `ClusterError::OwnershipChanged` if lease was already released or ownership changed.
   pub fn handle_activation_terminated(
     &self,
     identity: &ClusterIdentity,

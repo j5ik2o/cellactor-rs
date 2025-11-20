@@ -1,5 +1,8 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(test)]
+mod tests;
+
 /// Detects termination of a topology stream.
 #[derive(Debug, Default)]
 pub struct TopologyStreamHandle {
@@ -24,6 +27,3 @@ impl TopologyStreamHandle {
     self.closed.load(Ordering::SeqCst)
   }
 }
-
-#[cfg(test)]
-mod tests;
