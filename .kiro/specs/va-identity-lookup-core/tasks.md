@@ -5,14 +5,14 @@
   - _依存タスク: -_
   - _完了条件: 1.x 系子タスク完了かつ nightly ツールチェーンで PoC が green_
 
-- [ ] 1.1 ClusterConfig と ClusterRuntime の骨格を作成
+- [x] 1.1 ClusterConfig と ClusterRuntime の骨格を作成
   - ClusterConfig で rendezvous 設定・retry・topology 受信チャネルを扱えるようにする
   - ClusterRuntime に IdentityLookupService / ActivationLedger / ClusterMetrics への参照を保持させ、ExtensionInstaller から初期化
   - _対応要件: 1.1, 1.5_
   - _依存タスク: -_
   - _完了条件: コンフィグ生成と Runtime 起動が単体テストで確認できること_
 
-- [ ] 1.2 HashRingProvider と ActivationLedger を実装
+- [x] 1.2 HashRingProvider と ActivationLedger を実装
   - hash_rings + rapidhash を包む HashRingProvider を作り、トップロジー更新に伴う再構築を実装
   - ActivationLedger で lease 取得／解放／ Revoked 状態を管理し、ClusterRuntime.resolve に接続
   - _対応要件: 1.1, 1.2, 1.3, 1.5_

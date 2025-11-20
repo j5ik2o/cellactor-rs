@@ -1,0 +1,28 @@
+[package]
+name = "fraktor-cluster-rs"
+version = "0.2.11"
+edition = "2024"
+description = "Cluster extension and identity lookup runtime for fraktor"
+license = "MIT OR Apache-2.0"
+keywords = ["fraktor", "cluster", "virtual-actor", "no_std"]
+categories = ["concurrency", "embedded", "no-std"]
+repository = "https://github.com/j5ik2o/fraktor-rs"
+homepage = "https://github.com/j5ik2o/fraktor-rs"
+documentation = "https://docs.rs/fraktor-cluster-rs"
+readme = "../../README.md"
+
+[features]
+default = []
+alloc = []
+std = [
+    "fraktor-utils-rs/std",
+    "fraktor-actor-rs/std",
+]
+
+[dependencies]
+fraktor-utils-rs = { workspace = true, default-features = false, features = ["alloc", "unsize"] }
+fraktor-actor-rs = { workspace = true }
+thiserror = { workspace = true, default-features = false }
+hashbrown = { workspace = true, default-features = false }
+rapidhash = { version = "1.4", default-features = false }
+libm = { version = "0.2", default-features = false }
