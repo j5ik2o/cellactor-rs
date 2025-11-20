@@ -31,11 +31,16 @@ impl ResolveBridge<NoStdToolbox> for MockRuntime {
 #[derive(Default)]
 struct MockMetrics {
     retries: Mutex<u32>,
+    timeouts: Mutex<u32>,
 }
 
 impl MockMetrics {
     fn retry_count(&self) -> u32 {
         *self.retries.lock().unwrap()
+    }
+
+    fn timeout_count(&self) -> u32 {
+        *self.timeouts.lock().unwrap()
     }
 }
 
@@ -44,8 +49,14 @@ impl ClusterMetrics for MockMetrics {
         self
     }
 
-    fn record_retry(&self, _identity: &ClusterIdentity) {
+    fn record_request_duration(&self, _identity: &ClusterIdentity, _duration: core::time::Duration) {}
+
+    fn record_retry_attempt(&self, _identity: &ClusterIdentity) {
         *self.retries.lock().unwrap() += 1;
+    }
+
+    fn record_timeout(&self, _identity: &ClusterIdentity) {
+        *self.timeouts.lock().unwrap() += 1;
     }
 }
 
@@ -89,6 +100,7 @@ fn retries_until_success() {
 
     assert_eq!(result.unwrap().pid(), Pid::new(3, 0));
     assert_eq!(*runtime.calls.lock().unwrap(), 2);
+    assert_eq!(metrics.retry_count(), 1); // one retry attempt recorded
 }
 
 #[test]
@@ -101,7 +113,8 @@ fn gives_up_after_exhaustion() {
 
     let result = ctx.request(&identity, &NodeId::new("req"));
 
-    assert!(matches!(result, Err(ClusterError::Blocked)));
+    assert!(matches!(result, Err(ClusterError::Timeout)));
     assert_eq!(*runtime.calls.lock().unwrap(), 2);
     assert_eq!(metrics.retry_count(), 2);
+    assert_eq!(metrics.timeout_count(), 1);
 }

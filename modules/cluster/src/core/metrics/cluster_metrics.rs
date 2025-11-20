@@ -13,8 +13,14 @@ pub trait ClusterMetrics: Send + Sync + 'static {
   /// Records the time spent resolving an identity.
   fn record_resolve_duration(&self, _identity: &ClusterIdentity, _duration: Duration) {}
 
+  /// Records the time spent processing a request (resolve + send).
+  fn record_request_duration(&self, _identity: &ClusterIdentity, _duration: Duration) {}
+
   /// Records that a retry was attempted for the identity.
-  fn record_retry(&self, _identity: &ClusterIdentity) {}
+  fn record_retry_attempt(&self, _identity: &ClusterIdentity) {}
+
+  /// Records that the request timed out after retries.
+  fn record_timeout(&self, _identity: &ClusterIdentity) {}
 
   /// Sets the current virtual actor gauge.
   fn set_virtual_actor_gauge(&self, _value: usize) {}

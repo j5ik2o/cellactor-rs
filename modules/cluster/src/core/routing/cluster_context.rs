@@ -50,6 +50,7 @@ where
     pub fn request(&self, identity: &ClusterIdentity, requester: &NodeId) -> Result<PidCacheEntry, ClusterError> {
         if let Some(entry) = self.cache.get(identity) {
             self.metrics.record_resolve_duration(identity, Duration::ZERO);
+            self.metrics.record_request_duration(identity, Duration::ZERO);
             return Ok(entry);
         }
 
@@ -59,15 +60,19 @@ where
                 Ok(entry) => {
                     self.cache.insert(identity.clone(), entry.clone());
                     self.metrics.record_resolve_duration(identity, Duration::ZERO);
+                    self.metrics.record_request_duration(identity, Duration::ZERO);
                     return Ok(entry);
                 }
                 Err(err) => match runner.next_outcome() {
                     RetryOutcome::RetryAfter(_) => {
                         self.cache.invalidate(identity);
-                        self.metrics.record_retry(identity);
+                        self.metrics.record_retry_attempt(identity);
                         continue;
                     }
-                    RetryOutcome::GiveUp => return Err(err),
+                    RetryOutcome::GiveUp => {
+                        self.metrics.record_timeout(identity);
+                        return Err(ClusterError::Timeout);
+                    }
                 },
             }
         }

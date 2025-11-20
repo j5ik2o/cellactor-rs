@@ -38,6 +38,7 @@ impl TopologyStream for DummyStream {
 struct TestMetrics {
   resolves:    Mutex<u32>,
   retries:     Mutex<u32>,
+  timeouts:    Mutex<u32>,
   block_lists: Mutex<u32>,
   gauge:       Mutex<usize>,
 }
@@ -54,6 +55,10 @@ impl TestMetrics {
   fn resolve_count(&self) -> u32 {
     *self.resolves.lock().unwrap()
   }
+
+  fn timeout_count(&self) -> u32 {
+    *self.timeouts.lock().unwrap()
+  }
 }
 
 impl ClusterMetrics for TestMetrics {
@@ -65,8 +70,16 @@ impl ClusterMetrics for TestMetrics {
     *self.resolves.lock().unwrap() += 1;
   }
 
-  fn record_retry(&self, _identity: &ClusterIdentity) {
+  fn record_request_duration(&self, _identity: &ClusterIdentity, _duration: core::time::Duration) {
+    // ignore for tests
+  }
+
+  fn record_retry_attempt(&self, _identity: &ClusterIdentity) {
     *self.retries.lock().unwrap() += 1;
+  }
+
+  fn record_timeout(&self, _identity: &ClusterIdentity) {
+    *self.timeouts.lock().unwrap() += 1;
   }
 
   fn set_virtual_actor_gauge(&self, value: usize) {

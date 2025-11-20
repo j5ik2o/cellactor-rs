@@ -14,10 +14,13 @@ use crate::core::{
 pub struct StdClusterMetrics {
   enabled:               bool,
   resolves:              Mutex<u64>,
+  requests:              Mutex<u64>,
   retries:               Mutex<u64>,
+  timeouts:              Mutex<u64>,
   block_lists:           Mutex<u64>,
   gauge:                 Mutex<usize>,
   last_resolve_duration: Mutex<Option<Duration>>,
+  last_request_duration: Mutex<Option<Duration>>,
 }
 
 impl StdClusterMetrics {
@@ -27,10 +30,13 @@ impl StdClusterMetrics {
     Self {
       enabled:               config.enabled(),
       resolves:              Mutex::new(0),
+      requests:              Mutex::new(0),
       retries:               Mutex::new(0),
+      timeouts:              Mutex::new(0),
       block_lists:           Mutex::new(0),
       gauge:                 Mutex::new(0),
       last_resolve_duration: Mutex::new(None),
+      last_request_duration: Mutex::new(None),
     }
   }
 
@@ -44,6 +50,18 @@ impl StdClusterMetrics {
   #[must_use]
   pub fn retry_count(&self) -> u64 {
     *self.retries.lock().expect("mutex poisoned")
+  }
+
+  /// 記録済みのタイムアウト数を取得（テスト用）。
+  #[must_use]
+  pub fn timeout_count(&self) -> u64 {
+    *self.timeouts.lock().expect("mutex poisoned")
+  }
+
+  /// 記録済みのリクエスト数を取得（テスト用）。
+  #[must_use]
+  pub fn request_count(&self) -> u64 {
+    *self.requests.lock().expect("mutex poisoned")
   }
 
   /// 記録済みの BlockList 件数を取得（テスト用）。
@@ -63,6 +81,12 @@ impl StdClusterMetrics {
   pub fn last_resolve_duration(&self) -> Option<Duration> {
     *self.last_resolve_duration.lock().expect("mutex poisoned")
   }
+
+  /// 最新のリクエスト所要時間を取得（テスト用）。
+  #[must_use]
+  pub fn last_request_duration(&self) -> Option<Duration> {
+    *self.last_request_duration.lock().expect("mutex poisoned")
+  }
 }
 
 impl ClusterMetrics for StdClusterMetrics {
@@ -78,11 +102,26 @@ impl ClusterMetrics for StdClusterMetrics {
     *self.last_resolve_duration.lock().expect("mutex poisoned") = Some(duration);
   }
 
-  fn record_retry(&self, _identity: &ClusterIdentity) {
+  fn record_request_duration(&self, _identity: &ClusterIdentity, duration: Duration) {
+    if !self.enabled {
+      return;
+    }
+    *self.requests.lock().expect("mutex poisoned") += 1;
+    *self.last_request_duration.lock().expect("mutex poisoned") = Some(duration);
+  }
+
+  fn record_retry_attempt(&self, _identity: &ClusterIdentity) {
     if !self.enabled {
       return;
     }
     *self.retries.lock().expect("mutex poisoned") += 1;
+  }
+
+  fn record_timeout(&self, _identity: &ClusterIdentity) {
+    if !self.enabled {
+      return;
+    }
+    *self.timeouts.lock().expect("mutex poisoned") += 1;
   }
 
   fn set_virtual_actor_gauge(&self, value: usize) {
