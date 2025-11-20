@@ -9,5 +9,9 @@ pub trait PlacementSpawner<TB>
 where
   TB: RuntimeToolbox + 'static, {
   /// Attempts to spawn the actor described by the props.
+  ///
+  /// # Errors
+  ///
+  /// Returns `PlacementSpawnerError` if the actor could not be spawned.
   fn spawn(&self, identity: &ClusterIdentity, props: PropsGeneric<TB>) -> Result<Pid, PlacementSpawnerError>;
 }

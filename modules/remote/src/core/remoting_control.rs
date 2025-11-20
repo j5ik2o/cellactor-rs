@@ -15,15 +15,32 @@ pub trait RemotingControl<TB>: Send + Sync
 where
   TB: RuntimeToolbox + 'static, {
   /// Starts the remoting subsystem if it is not already running.
+  ///
+  /// # Errors
+  ///
+  /// Returns `RemotingError` if the subsystem is already started or shutdown, or if bootstrap
+  /// fails.
   fn start(&self) -> Result<(), RemotingError>;
 
   /// Requests an association with the provided actor-path authority.
+  ///
+  /// # Errors
+  ///
+  /// Returns `RemotingError` if the subsystem is not running or association fails.
   fn associate(&self, address: &ActorPathParts) -> Result<(), RemotingError>;
 
   /// Forces the specified authority into quarantine for the provided reason.
+  ///
+  /// # Errors
+  ///
+  /// Returns `RemotingError` if the subsystem is not running or quarantine operation fails.
   fn quarantine(&self, authority: &str, reason: &QuarantineReason) -> Result<(), RemotingError>;
 
   /// Initiates shutdown and releases transport resources.
+  ///
+  /// # Errors
+  ///
+  /// Returns `RemotingError` if the subsystem is already shutdown or shutdown fails.
   fn shutdown(&self) -> Result<(), RemotingError>;
 
   /// Registers a listener for future backpressure notifications.

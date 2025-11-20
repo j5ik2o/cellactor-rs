@@ -1,4 +1,4 @@
-use super::super::activation::activation_error::ActivationError;
+use crate::core::activation::ActivationError;
 
 /// Errors returned when placement cannot spawn an actor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

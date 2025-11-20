@@ -38,25 +38,25 @@ impl RemotingEnvelope {
 
   /// Returns the fully qualified recipient path.
   #[must_use]
-  pub fn recipient(&self) -> &ActorPath {
+  pub const fn recipient(&self) -> &ActorPath {
     &self.recipient
   }
 
   /// Returns the remote node metadata resolved during the handshake.
   #[must_use]
-  pub fn remote_node(&self) -> &RemoteNodeId {
+  pub const fn remote_node(&self) -> &RemoteNodeId {
     &self.remote_node
   }
 
   /// Returns the optional reply target path.
   #[must_use]
-  pub fn reply_to(&self) -> Option<&ActorPath> {
+  pub const fn reply_to(&self) -> Option<&ActorPath> {
     self.reply_to.as_ref()
   }
 
   /// Returns the serialized payload.
   #[must_use]
-  pub fn serialized_message(&self) -> &SerializedMessage {
+  pub const fn serialized_message(&self) -> &SerializedMessage {
     &self.serialized
   }
 

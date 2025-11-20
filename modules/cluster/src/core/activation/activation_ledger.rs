@@ -12,6 +12,9 @@ use super::{
 };
 use crate::core::identity::{ClusterIdentity, NodeId};
 
+#[cfg(test)]
+mod tests;
+
 /// Tracks activation leases per cluster identity.
 pub struct ActivationLedger<TB>
 where
@@ -44,6 +47,10 @@ where
   }
 
   /// Attempts to acquire a lease for the provided identity.
+  ///
+  /// # Errors
+  ///
+  /// Returns `LedgerError::AlreadyOwned` if a lease already exists for the given identity.
   pub fn acquire(
     &self,
     identity: ClusterIdentity,
@@ -148,6 +155,3 @@ impl Default for LedgerState {
     Self { sequence: 0, entries: LeaseMap::with_hasher(RapidBuildHasher::default()) }
   }
 }
-
-#[cfg(test)]
-mod tests;

@@ -61,9 +61,9 @@ async fn main() -> Result<()> {
   let provider =
     sender.extended().actor_ref_provider::<TokioActorRefProviderGeneric<StdToolbox>>().expect("provider installed");
 
-  provider.watch_remote(receiver_authority_parts()).map_err(|error| anyhow!("{error}"))?;
+  provider.watch_remote(&receiver_authority_parts()).map_err(|error| anyhow!("{error}"))?;
 
-  let remote_ref = provider.actor_ref(remote_echo_path()).expect("remote actor ref");
+  let remote_ref = provider.actor_ref(&remote_echo_path()).expect("remote actor ref");
   remote_ref.tell(AnyMessage::new("ping over remoting".to_string())).map_err(|error| anyhow!("{error:?}"))?;
   println!("sender -> remote: ping over remoting");
 

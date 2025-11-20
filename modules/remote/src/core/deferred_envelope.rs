@@ -11,13 +11,13 @@ pub struct DeferredEnvelope {
 impl DeferredEnvelope {
   /// Creates a new deferred envelope backed by the provided message.
   #[must_use]
-  pub fn new(envelope: RemotingEnvelope) -> Self {
+  pub const fn new(envelope: RemotingEnvelope) -> Self {
     Self { envelope }
   }
 
   /// Borrows the underlying envelope.
   #[must_use]
-  pub fn as_envelope(&self) -> &RemotingEnvelope {
+  pub const fn as_envelope(&self) -> &RemotingEnvelope {
     &self.envelope
   }
 

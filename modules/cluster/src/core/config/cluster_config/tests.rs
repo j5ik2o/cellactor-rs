@@ -1,8 +1,8 @@
 use alloc::{boxed::Box, string::String};
 
 use crate::core::config::{
-  ClusterConfig, ClusterConfigError, ClusterMetricsConfig, HashStrategy, RetryJitter, RetryPolicy, TopologyStream,
-  TopologyWatch,
+  ClusterConfig, ClusterConfigError, ClusterMetricsConfig, HashStrategy, RetryJitter, RetryPolicy, TopologyWatch,
+  topology_stream::TopologyStream,
 };
 
 #[derive(Clone, Debug)]

@@ -22,7 +22,7 @@ pub struct RemoteActorRefProviderInstaller<TB: RuntimeToolbox + 'static> {
 impl<TB: RuntimeToolbox + 'static> RemoteActorRefProviderInstaller<TB> {
   /// Creates a remote actor-ref provider installer with loopback routing enabled.
   #[must_use]
-  pub fn loopback() -> Self {
+  pub const fn loopback() -> Self {
     Self { enable_loopback: true, _marker: core::marker::PhantomData }
   }
 }
@@ -53,7 +53,7 @@ impl<TB: RuntimeToolbox + 'static> ActorRefProviderInstaller<TB> for RemoteActor
       .map_err(|error| ActorSystemBuildError::Configuration(format!("{error}")))?;
     let provider = ArcShared::new(provider);
     extended.register_actor_ref_provider(provider.clone());
-    extended.register_remote_watch_hook(provider.clone());
+    extended.register_remote_watch_hook(provider);
 
     if self.enable_loopback {
       let Some(authority) = system.canonical_authority() else {

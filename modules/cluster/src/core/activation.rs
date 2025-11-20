@@ -1,25 +1,25 @@
 //! Activation management primitives.
 
 /// Activation error enumeration for responses.
-pub mod activation_error;
+mod activation_error;
 /// Activation lease container.
-pub mod activation_lease;
+mod activation_lease;
 /// Ledger storing activation leases.
-pub mod activation_ledger;
+mod activation_ledger;
 /// Incoming activation request payloads.
-pub mod activation_request;
+mod activation_request;
 /// Activation responses emitted by PlacementActor.
-pub mod activation_response;
+mod activation_response;
 /// Lease identifier newtype.
-pub mod lease_id;
+mod lease_id;
 /// Lease status enumeration.
-pub mod lease_status;
-/// Errors emitted by the ledger when operations fail。
-pub mod ledger_error;
-/// Bridge trait forwarding requests to partition/placement層。
-pub mod partition_bridge;
-/// Errors produced by the partition bridge。
-pub mod partition_bridge_error;
+mod lease_status;
+/// Errors emitted by the ledger when operations fail.
+mod ledger_error;
+/// Bridge trait forwarding requests to partition/placement layer.
+mod partition_bridge;
+/// Errors produced by the partition bridge.
+mod partition_bridge_error;
 
 pub use activation_error::ActivationError;
 pub use activation_lease::ActivationLease;

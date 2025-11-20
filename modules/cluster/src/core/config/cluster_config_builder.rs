@@ -20,6 +20,7 @@ pub struct ClusterConfigBuilder {
 
 impl ClusterConfigBuilder {
   /// Creates a new builder instance with defaults.
+  #[must_use]
   pub fn new() -> Self {
     Self {
       system_name:          None,
@@ -39,42 +40,52 @@ impl ClusterConfigBuilder {
   }
 
   /// Selects the rendezvous hash strategy.
-  pub fn hash_strategy(mut self, strategy: HashStrategy) -> Self {
+  #[must_use]
+  pub const fn hash_strategy(mut self, strategy: HashStrategy) -> Self {
     self.hash_strategy = strategy;
     self
   }
 
   /// Overrides the retry policy.
-  pub fn retry_policy(mut self, policy: RetryPolicy) -> Self {
+  #[must_use]
+  pub const fn retry_policy(mut self, policy: RetryPolicy) -> Self {
     self.retry_policy = policy;
     self
   }
 
   /// Sets the topology watch handle supplying membership updates.
+  #[must_use]
   pub fn topology_watch(mut self, watch: TopologyWatch) -> Self {
     self.topology_watch = Some(watch);
     self
   }
 
   /// Controls whether weighted rendezvous is allowed.
-  pub fn allow_weighted_nodes(mut self, enabled: bool) -> Self {
+  #[must_use]
+  pub const fn allow_weighted_nodes(mut self, enabled: bool) -> Self {
     self.allow_weighted_nodes = enabled;
     self
   }
 
   /// Adjusts metrics export configuration.
+  #[must_use]
   pub fn metrics_config(mut self, config: ClusterMetricsConfig) -> Self {
     self.metrics_config = config;
     self
   }
 
   /// Overrides the hash seed used for rendezvous hashing.
-  pub fn hash_seed(mut self, seed: u64) -> Self {
+  #[must_use]
+  pub const fn hash_seed(mut self, seed: u64) -> Self {
     self.hash_seed = seed;
     self
   }
 
   /// Finalizes the builder into a cluster configuration.
+  ///
+  /// # Errors
+  ///
+  /// Returns `ClusterConfigError::MissingTopologyWatch` if no topology watch was configured.
   pub fn build(self) -> Result<ClusterConfig, ClusterConfigError> {
     let system_name = self.system_name.unwrap_or_else(|| String::from("fraktor-cluster"));
     let topology_watch = self.topology_watch.ok_or(ClusterConfigError::MissingTopologyWatch)?;

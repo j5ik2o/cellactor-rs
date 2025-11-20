@@ -29,14 +29,14 @@ impl<TB> RemoteWatcherDaemon<TB>
 where
   TB: RuntimeToolbox + 'static,
 {
-  fn new(control: RemotingControlHandle<TB>) -> Self {
+  const fn new(control: RemotingControlHandle<TB>) -> Self {
     Self { control, watchers: Vec::new() }
   }
 
   /// Spawns the daemon under the system guardian hierarchy.
   pub(crate) fn spawn(
     system: &ActorSystemGeneric<TB>,
-    control: RemotingControlHandle<TB>,
+    control: &RemotingControlHandle<TB>,
   ) -> Result<ActorRefGeneric<TB>, RemotingError> {
     let props = PropsGeneric::from_fn({
       let handle = control.clone();

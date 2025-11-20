@@ -48,9 +48,9 @@
 #![deny(unreachable_pub)]
 #![allow(unknown_lints)]
 #![deny(cfg_std_forbid)]
+#![cfg_attr(not(test), no_std)]
 #![cfg_attr(feature = "unsize", feature(unsize, coerce_unsized, dispatch_from_dyn))]
 #![cfg_attr(feature = "unsize", allow(incomplete_features))]
-#![cfg_attr(not(test), no_std)]
 
 //! Utilities for the fraktor actor runtime.
 

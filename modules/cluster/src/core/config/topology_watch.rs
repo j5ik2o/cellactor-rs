@@ -10,16 +10,19 @@ pub struct TopologyWatch {
 
 impl TopologyWatch {
   /// Wraps a topology stream inside a watch handle.
+  #[must_use]
   pub fn new(stream: Box<dyn TopologyStream>) -> Self {
     Self { stream }
   }
 
   /// Returns the identifier of the underlying stream for diagnostics.
+  #[must_use]
   pub fn stream_id(&self) -> &'static str {
     self.stream.stream_id()
   }
 
   /// Provides immutable access to the underlying stream trait object.
+  #[must_use]
   pub fn stream(&self) -> &dyn TopologyStream {
     self.stream.as_ref()
   }

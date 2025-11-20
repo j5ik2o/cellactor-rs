@@ -15,7 +15,8 @@ pub struct RemotingExtensionInstaller {
 
 impl RemotingExtensionInstaller {
   /// Creates a new remoting extension installer with the specified configuration.
-  pub fn new(config: RemotingExtensionConfig) -> Self {
+  #[must_use]
+  pub const fn new(config: RemotingExtensionConfig) -> Self {
     Self { config }
   }
 }

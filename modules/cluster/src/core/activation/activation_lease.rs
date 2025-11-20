@@ -1,5 +1,5 @@
 use super::{lease_id::LeaseId, lease_status::LeaseStatus};
-use crate::core::identity::node_id::NodeId;
+use crate::core::identity::NodeId;
 
 /// Records ownership information for a cluster identity.
 #[derive(Clone, Debug, PartialEq, Eq)]

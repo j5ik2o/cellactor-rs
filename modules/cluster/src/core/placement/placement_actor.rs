@@ -7,6 +7,9 @@ use crate::core::{
   identity::ClusterIdentity,
 };
 
+#[cfg(test)]
+mod tests;
+
 /// Drives activation requests and emits responses based on spawner outcomes.
 pub struct PlacementActor<TB, S>
 where
@@ -40,7 +43,7 @@ where
 
   /// Handles a termination notification for the provided identity.
   #[must_use]
-  pub fn handle_terminated(
+  pub const fn handle_terminated(
     &self,
     identity: ClusterIdentity,
     lease_id: LeaseId,
@@ -51,7 +54,7 @@ where
 
   /// Handles a graceful release completion signal.
   #[must_use]
-  pub fn handle_released(
+  pub const fn handle_released(
     &self,
     identity: ClusterIdentity,
     lease_id: LeaseId,
@@ -61,12 +64,9 @@ where
   }
 }
 
-fn map_spawner_error(err: PlacementSpawnerError) -> ActivationError {
+const fn map_spawner_error(err: PlacementSpawnerError) -> ActivationError {
   match err {
     | PlacementSpawnerError::UnknownKind => ActivationError::UnknownKind,
     | PlacementSpawnerError::SpawnFailed => ActivationError::SpawnFailed,
   }
 }
-
-#[cfg(test)]
-mod tests;

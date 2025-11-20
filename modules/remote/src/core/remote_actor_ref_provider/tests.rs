@@ -69,7 +69,7 @@ fn serialization_extension(
 fn provider(system: &ActorSystemGeneric<NoStdToolbox>) -> RemoteActorRefProvider {
   let serialization = serialization_extension(system);
   let writer = ArcShared::new(EndpointWriter::new(system.clone(), serialization));
-  let control = RemotingControlHandle::new(system.clone(), RemotingExtensionConfig::default());
+  let control = RemotingControlHandle::new(system.clone(), &RemotingExtensionConfig::default());
   control.start().expect("control start");
   let authority_manager = system.state().remote_authority_manager().clone();
   RemoteActorRefProvider::from_components(system.clone(), writer, control, authority_manager).expect("provider builds")
@@ -89,7 +89,7 @@ fn actor_ref_sends_messages_via_endpoint_writer() {
   let system = build_system();
   let provider = provider(&system);
   let writer = provider.writer_for_test();
-  let remote = provider.actor_ref(remote_path()).expect("actor ref");
+  let remote = provider.actor_ref(&remote_path()).expect("actor ref");
 
   remote.tell(AnyMessageGeneric::new("hello".to_string())).expect("send succeeds");
 
@@ -106,14 +106,14 @@ fn watch_remote_associates_authority() {
   let provider = provider(&system);
   let mut parts = ActorPathParts::with_authority("remote-app", Some(("10.0.0.1", 9000)));
   parts = parts.with_guardian(GuardianKind::User);
-  provider.watch_remote(parts).expect("watch succeeds");
+  provider.watch_remote(&parts).expect("watch succeeds");
 }
 
 #[test]
 fn registers_remote_entry_for_remote_pid() {
   let system = build_system();
   let provider = provider(&system);
-  let remote = provider.actor_ref(remote_path()).expect("actor ref");
+  let remote = provider.actor_ref(&remote_path()).expect("actor ref");
   let registered = provider.registered_remote_pids_for_test();
   assert!(registered.contains(&remote.pid()));
 }
@@ -122,7 +122,7 @@ fn registers_remote_entry_for_remote_pid() {
 fn remote_watch_hook_tracks_watcher_lifecycle() {
   let system = build_system();
   let provider = provider(&system);
-  let remote = provider.actor_ref(remote_path()).expect("actor ref");
+  let remote = provider.actor_ref(&remote_path()).expect("actor ref");
   let watcher = Pid::new(42, 0);
 
   assert!(RemoteWatchHook::handle_watch(&provider, remote.pid(), watcher));

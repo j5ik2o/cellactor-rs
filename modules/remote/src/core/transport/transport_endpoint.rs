@@ -11,7 +11,7 @@ pub struct TransportEndpoint {
 impl TransportEndpoint {
   /// Creates a new endpoint by authority string.
   #[must_use]
-  pub fn new(authority: String) -> Self {
+  pub const fn new(authority: String) -> Self {
     Self { authority }
   }
 

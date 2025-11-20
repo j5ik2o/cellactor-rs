@@ -17,13 +17,13 @@ pub struct OutboundMessage<TB: RuntimeToolbox + 'static> {
 impl<TB: RuntimeToolbox + 'static> OutboundMessage<TB> {
   /// Creates a user-priority message.
   #[must_use]
-  pub fn user(message: AnyMessageGeneric<TB>, recipient: ActorPath, remote_node: RemoteNodeId) -> Self {
+  pub const fn user(message: AnyMessageGeneric<TB>, recipient: ActorPath, remote_node: RemoteNodeId) -> Self {
     Self { message, recipient, remote_node, reply_to: None, priority: OutboundPriority::User }
   }
 
   /// Creates a system-priority message.
   #[must_use]
-  pub fn system(message: AnyMessageGeneric<TB>, recipient: ActorPath, remote_node: RemoteNodeId) -> Self {
+  pub const fn system(message: AnyMessageGeneric<TB>, recipient: ActorPath, remote_node: RemoteNodeId) -> Self {
     Self { message, recipient, remote_node, reply_to: None, priority: OutboundPriority::System }
   }
 

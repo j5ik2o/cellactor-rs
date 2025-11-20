@@ -5,7 +5,7 @@
   - _依存タスク: -_
   - _完了条件: 1.x 子タスク完了かつ install 経路で Ready/Disabled/Error の判定と保存が動作すること_
 
-- [ ] 1.1 BootstrapStatusStore 実装とステータスロード/保存
+- [x] 1.1 BootstrapStatusStore 実装とステータスロード/保存
   - Ready/Disabled/Error{reason} を永続化するストアを用意し、デフォルトはインメモリ、外部ストア差し替えポイントを設ける。
   - install 前に状態を読み込み、install 後に結果を保存するフローを組み込み、保存失敗は起動を即時失敗させる。
   - ClusterExtensionHandle から現在状態を問い合わせできるようハンドルを露出し、再起動時の可否判定を可能にする。
@@ -13,7 +13,7 @@
   - _依存タスク: -_
   - _完了条件: 状態遷移とエラーパスの単体テストが緑で、永続化差し替えも確認できること_
 
-- [ ] 1.2 ブートストラップ install フローの拡張
+- [x] 1.2 ブートストラップ install フローの拡張
   - ActorSystem 起動前に Runtime/Context/Metrics/PartitionBridge を構築しハンドルを登録する組立処理を仕上げる。
   - feature 無効や設定で Disabled 判定となる場合は Runtime 生成をスキップし ActorSystem を変更しないルートを実装する。
   - 設定検証やトポロジ検知の失敗時に説明的エラーを返し、成功時のみ Ready を保存する起動ガードを追加する。

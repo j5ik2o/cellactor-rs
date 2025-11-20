@@ -48,14 +48,14 @@ impl RemotingExtensionConfig {
 
   /// Overrides the canonical port.
   #[must_use]
-  pub fn with_canonical_port(mut self, port: u16) -> Self {
+  pub const fn with_canonical_port(mut self, port: u16) -> Self {
     self.canonical_port = Some(port);
     self
   }
 
   /// Enables or disables automatic start during installation.
   #[must_use]
-  pub fn with_auto_start(mut self, enabled: bool) -> Self {
+  pub const fn with_auto_start(mut self, enabled: bool) -> Self {
     self.auto_start = enabled;
     self
   }

@@ -13,34 +13,45 @@ pub struct RetryPolicy {
 
 impl RetryPolicy {
   /// Creates a new retry policy description.
-  pub fn new(max_attempts: NonZeroU32, initial_backoff: Duration, max_backoff: Duration, jitter: RetryJitter) -> Self {
+  #[must_use]
+  pub const fn new(
+    max_attempts: NonZeroU32,
+    initial_backoff: Duration,
+    max_backoff: Duration,
+    jitter: RetryJitter,
+  ) -> Self {
     Self { max_attempts, initial_backoff, max_backoff, jitter }
   }
 
   /// Maximum attempts allowed for a single request.
-  pub fn max_attempts(&self) -> NonZeroU32 {
+  #[must_use]
+  pub const fn max_attempts(&self) -> NonZeroU32 {
     self.max_attempts
   }
 
   /// Initial delay before the first retry.
-  pub fn initial_backoff(&self) -> Duration {
+  #[must_use]
+  pub const fn initial_backoff(&self) -> Duration {
     self.initial_backoff
   }
 
   /// Maximum backoff allowed.
-  pub fn max_backoff(&self) -> Duration {
+  #[must_use]
+  pub const fn max_backoff(&self) -> Duration {
     self.max_backoff
   }
 
   /// Jitter strategy applied to backoff durations.
-  pub fn jitter(&self) -> RetryJitter {
+  #[must_use]
+  pub const fn jitter(&self) -> RetryJitter {
     self.jitter
   }
 }
 
 impl Default for RetryPolicy {
   fn default() -> Self {
-    let max_attempts = NonZeroU32::new(3).expect("non-zero");
+    // SAFETY: 3 is non-zero
+    let max_attempts = unsafe { NonZeroU32::new_unchecked(3) };
     Self {
       max_attempts,
       initial_backoff: Duration::from_millis(50),

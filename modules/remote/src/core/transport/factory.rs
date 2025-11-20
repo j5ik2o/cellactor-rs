@@ -15,6 +15,11 @@ pub struct TransportFactory;
 
 impl TransportFactory {
   /// Resolves a transport instance for the provided config.
+  ///
+  /// # Errors
+  ///
+  /// Returns `TransportError` if the configured transport scheme is unsupported or initialization
+  /// fails.
   pub fn build(config: &RemotingExtensionConfig) -> Result<ArcShared<dyn RemoteTransport>, TransportError> {
     #[cfg(feature = "std")]
     {

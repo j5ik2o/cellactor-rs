@@ -67,6 +67,7 @@ impl LoopbackTransport {
 
   /// Test helper that drains frames recorded for the provided handle.
   #[cfg(any(test, feature = "test-support"))]
+  #[must_use]
   pub fn drain_frames_for_test(&self, handle: &TransportHandle) -> Vec<Vec<u8>> {
     let mut guard = self.state.lock();
     guard

@@ -35,14 +35,14 @@ struct LoopbackDelivererImpl<TB: RuntimeToolbox + 'static> {
 }
 
 impl<TB: RuntimeToolbox + 'static> LoopbackDelivererImpl<TB> {
-  fn new(reader: EndpointReaderGeneric<TB>, system: ActorSystemGeneric<TB>) -> Self {
+  const fn new(reader: EndpointReaderGeneric<TB>, system: ActorSystemGeneric<TB>) -> Self {
     Self { reader, system }
   }
 }
 
 impl<TB: RuntimeToolbox + 'static> LoopbackDeliverer for LoopbackDelivererImpl<TB> {
   fn deliver(&self, envelope: RemotingEnvelope) {
-    match self.reader.decode(envelope) {
+    match self.reader.decode(&envelope) {
       | Ok(inbound) => {
         if let Err(error) = self.reader.deliver(inbound) {
           self.system.emit_log(LogLevel::Warn, format!("loopback delivery failed: {error:?}"), None);
@@ -67,7 +67,7 @@ type ArcDeliverer = ArcShared<dyn LoopbackDeliverer>;
 static REGISTRY: Mutex<Option<HashMap<String, ArcDeliverer, RandomState>>> = Mutex::new(None);
 
 #[allow(dead_code)]
-pub(crate) fn scheme() -> &'static str {
+pub(crate) const fn scheme() -> &'static str {
   LOOPBACK_SCHEME
 }
 

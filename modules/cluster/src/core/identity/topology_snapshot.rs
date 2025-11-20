@@ -12,13 +12,13 @@ pub struct TopologySnapshot {
 impl TopologySnapshot {
   /// Creates a new snapshot from the provided nodes.
   #[must_use]
-  pub fn new(hash: u64, members: Vec<ClusterNode>) -> Self {
+  pub const fn new(hash: u64, members: Vec<ClusterNode>) -> Self {
     Self { hash, members }
   }
 
   /// Returns the rendezvous hash of the snapshot contents.
   #[must_use]
-  pub fn hash(&self) -> u64 {
+  pub const fn hash(&self) -> u64 {
     self.hash
   }
 

@@ -12,7 +12,10 @@ use crate::core::{
   identity::ClusterIdentity,
 };
 
-/// Bridges clustered `ClusterEvent` を actor イベントストリームへ流すアダプタ。
+#[cfg(test)]
+mod tests;
+
+/// Bridges clustered ClusterEvent to actor event stream.
 pub struct ClusterEventStreamAdapter<TB>
 where
   TB: RuntimeToolbox + 'static, {
@@ -25,19 +28,19 @@ where
 {
   /// Creates a new adapter backed by the provided event stream.
   #[must_use]
-  pub fn new(event_stream: ArcShared<EventStreamGeneric<TB>>) -> Self {
+  pub const fn new(event_stream: ArcShared<EventStreamGeneric<TB>>) -> Self {
     Self { event_stream }
   }
 
   /// Drains publisher queue and publishes each event to the event stream.
   pub fn flush(&self, publisher: &ClusterEventPublisher<TB>) {
     for event in publisher.drain() {
-      let stream_event = self.to_log_event(&event);
+      let stream_event = Self::to_log_event(&event);
       self.event_stream.publish(&stream_event);
     }
   }
 
-  fn to_log_event(&self, event: &ClusterEvent) -> EventStreamEvent<TB> {
+  fn to_log_event(event: &ClusterEvent) -> EventStreamEvent<TB> {
     let (level, message) = match event {
       | ClusterEvent::ActivationStarted { identity, owner } => (
         LogLevel::Info,
@@ -69,6 +72,3 @@ where
 fn fmt_identity(identity: &ClusterIdentity) -> String {
   format!("{}/{}", identity.kind(), identity.identity())
 }
-
-#[cfg(test)]
-mod tests;

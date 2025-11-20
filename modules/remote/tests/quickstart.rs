@@ -117,7 +117,7 @@ fn quickstart_loopback_provider_flow() -> Result<()> {
   handle.start().map_err(|error| anyhow!("{error}"))?;
 
   provider
-    .watch_remote(ActorPathParts::with_authority("remote-system", Some(("127.0.0.1", 4321))))
+    .watch_remote(&ActorPathParts::with_authority("remote-system", Some(("127.0.0.1", 4321))))
     .map_err(|error| anyhow!("{error}"))?;
 
   handle.emit_backpressure_signal("127.0.0.1:4321", BackpressureSignal::Apply);
@@ -167,9 +167,9 @@ fn remote_provider_enqueues_message() -> Result<()> {
   handle.start().map_err(|error| anyhow!("{error}"))?;
   let provider = system.extended().actor_ref_provider::<LoopbackActorRefProvider>().expect("provider installed");
   provider
-    .watch_remote(ActorPathParts::with_authority("remote-system", Some(("127.0.0.1", 25520))))
+    .watch_remote(&ActorPathParts::with_authority("remote-system", Some(("127.0.0.1", 25520))))
     .map_err(|error| anyhow!("{error}"))?;
-  let remote = provider.actor_ref(remote_path()).expect("actor ref");
+  let remote = provider.actor_ref(&remote_path()).expect("actor ref");
   remote.tell(AnyMessageGeneric::new("loopback".to_string())).expect("send succeeds");
 
   let writer = provider.writer_for_test();
@@ -186,7 +186,7 @@ fn remote_watch_hook_handles_system_watch_messages() -> Result<()> {
   let (system, handle) = build_system(config);
   handle.start().map_err(|error| anyhow!("{error}"))?;
   let provider = system.extended().actor_ref_provider::<LoopbackActorRefProvider>().expect("provider installed");
-  let remote = provider.actor_ref(remote_path()).expect("remote actor ref");
+  let remote = provider.actor_ref(&remote_path()).expect("remote actor ref");
   let watcher = Pid::new(7777, 0);
 
   assert!(RemoteWatchHook::handle_watch(&*provider, remote.pid(), watcher));

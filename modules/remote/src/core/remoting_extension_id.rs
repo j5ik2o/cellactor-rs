@@ -21,7 +21,7 @@ where
 {
   /// Creates a new identifier with the provided configuration.
   #[must_use]
-  pub fn new(config: RemotingExtensionConfig) -> Self {
+  pub const fn new(config: RemotingExtensionConfig) -> Self {
     Self { config, marker: PhantomData }
   }
 }

@@ -12,6 +12,9 @@ use super::{
 };
 use crate::core::config::HashStrategy;
 
+#[cfg(test)]
+mod tests;
+
 /// Provides deterministic node selection via rendezvous hashing.
 #[derive(Debug)]
 pub struct HashRingProvider {
@@ -21,13 +24,10 @@ pub struct HashRingProvider {
   last_hash: u64,
 }
 
-#[cfg(test)]
-mod tests;
-
 impl HashRingProvider {
   /// Creates a provider with the given hashing strategy and seed.
   #[must_use]
-  pub fn new(strategy: HashStrategy, hash_seed: u64) -> Self {
+  pub const fn new(strategy: HashStrategy, hash_seed: u64) -> Self {
     Self { strategy, hash_seed, nodes: Vec::new(), last_hash: 0 }
   }
 
@@ -58,13 +58,13 @@ impl HashRingProvider {
 
   /// Returns the hash of the last applied topology snapshot.
   #[must_use]
-  pub fn topology_hash(&self) -> u64 {
+  pub const fn topology_hash(&self) -> u64 {
     self.last_hash
   }
 
   /// Returns true when the ring contains no members.
   #[must_use]
-  pub fn is_empty(&self) -> bool {
+  pub const fn is_empty(&self) -> bool {
     self.nodes.is_empty()
   }
 

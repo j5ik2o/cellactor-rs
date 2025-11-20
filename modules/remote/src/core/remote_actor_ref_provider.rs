@@ -51,16 +51,20 @@ pub type RemoteActorRefProvider = RemoteActorRefProviderGeneric<NoStdToolbox>;
 impl<TB: RuntimeToolbox + 'static> RemoteActorRefProviderGeneric<TB> {
   /// Creates a remote actor-ref provider installer with loopback routing enabled.
   #[must_use]
-  pub fn loopback() -> RemoteActorRefProviderInstaller<TB> {
+  pub const fn loopback() -> RemoteActorRefProviderInstaller<TB> {
     RemoteActorRefProviderInstaller::loopback()
   }
 
   /// Creates a remote actor reference for the provided path.
-  pub fn actor_ref(&self, path: ActorPath) -> Result<ActorRefGeneric<TB>, RemoteActorRefProviderError> {
+  ///
+  /// # Errors
+  ///
+  /// Returns `RemoteActorRefProviderError` if association or path parsing fails.
+  pub fn actor_ref(&self, path: &ActorPath) -> Result<ActorRefGeneric<TB>, RemoteActorRefProviderError> {
     self.control.associate(path.parts()).map_err(RemoteActorRefProviderError::from)?;
-    let sender = self.sender_for_path(&path)?;
+    let sender = self.sender_for_path(path)?;
     let pid = self.system.allocate_pid();
-    self.register_remote_entry(pid, path.clone());
+    self.register_remote_entry(pid, path);
     Ok(ActorRefGeneric::new(pid, ArcShared::new(sender)))
   }
 
@@ -70,7 +74,7 @@ impl<TB: RuntimeToolbox + 'static> RemoteActorRefProviderGeneric<TB> {
     control: RemotingControlHandle<TB>,
     authority_manager: ArcShared<RemoteAuthorityManagerGeneric<TB>>,
   ) -> Result<Self, RemoteActorRefProviderError> {
-    let daemon = RemoteWatcherDaemon::spawn(&system, control.clone())?;
+    let daemon = RemoteWatcherDaemon::spawn(&system, &control)?;
     Ok(Self {
       system,
       writer,
@@ -108,13 +112,17 @@ impl<TB: RuntimeToolbox + 'static> RemoteActorRefProviderGeneric<TB> {
   }
 
   /// Requests an association/watch with the provided remote address.
-  pub fn watch_remote(&self, parts: ActorPathParts) -> Result<(), RemotingError> {
+  ///
+  /// # Errors
+  ///
+  /// Returns `RemotingError` if transport is unavailable or association fails.
+  pub fn watch_remote(&self, parts: &ActorPathParts) -> Result<(), RemotingError> {
     let Some(authority) = parts.authority_endpoint() else {
       return Err(RemotingError::TransportUnavailable("missing authority".into()));
     };
     let _ = self.authority_manager.state(&authority);
-    self.record_snapshot_from_parts(&parts);
-    self.control.associate(&parts)
+    self.record_snapshot_from_parts(parts);
+    self.control.associate(parts)
   }
 
   /// Returns the latest remote authority snapshots recorded by the control plane.
@@ -123,7 +131,7 @@ impl<TB: RuntimeToolbox + 'static> RemoteActorRefProviderGeneric<TB> {
     self.control.connections_snapshot()
   }
 
-  fn register_remote_entry(&self, pid: Pid, path: ActorPath) {
+  fn register_remote_entry(&self, pid: Pid, path: &ActorPath) {
     let mut guard = self.watch_entries.lock();
     guard.entry(pid).or_insert_with(|| RemoteWatchEntry::new(path.clone()));
     self.record_snapshot_from_parts(path.parts());
@@ -212,7 +220,7 @@ impl<TB: RuntimeToolbox + 'static> RemoteActorRefSender<TB> {
     }
   }
 
-  fn map_error(&self, error: EndpointWriterError, message: AnyMessageGeneric<TB>) -> SendError<TB> {
+  const fn map_error(error: &EndpointWriterError, message: AnyMessageGeneric<TB>) -> SendError<TB> {
     match error {
       | EndpointWriterError::QueueFull(_) => SendError::full(message),
       | EndpointWriterError::QueueClosed(_) | EndpointWriterError::QueueUnavailable { .. } => {
@@ -243,9 +251,9 @@ impl<TB: RuntimeToolbox + 'static> ActorRefSender<TB> for RemoteActorRefSender<T
     match loopback_router::try_deliver(&self.remote_node, &self.writer, outbound) {
       | Ok(LoopbackDeliveryOutcome::Delivered) => Ok(()),
       | Ok(LoopbackDeliveryOutcome::Pending(pending)) => {
-        self.writer.enqueue(*pending).map_err(|error| self.map_error(error, message_clone))
+        self.writer.enqueue(*pending).map_err(|error| Self::map_error(&error, message_clone))
       },
-      | Err(error) => Err(self.map_error(error, message_clone)),
+      | Err(error) => Err(Self::map_error(&error, message_clone)),
     }
   }
 }
@@ -256,7 +264,7 @@ struct RemoteWatchEntry {
 }
 
 impl RemoteWatchEntry {
-  fn new(path: ActorPath) -> Self {
+  const fn new(path: ActorPath) -> Self {
     Self { path, watchers: Vec::new() }
   }
 

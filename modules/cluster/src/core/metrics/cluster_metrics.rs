@@ -1,5 +1,8 @@
 use core::{any::Any, time::Duration};
 
+#[cfg(test)]
+mod tests;
+
 use crate::core::identity::{ClusterIdentity, NodeId};
 
 /// Metrics sink for cluster-specific signals.
@@ -18,13 +21,4 @@ pub trait ClusterMetrics: Send + Sync + 'static {
 
   /// Records that block list actions affected a node.
   fn increment_block_list(&self, _node: &NodeId) {}
-}
-
-/// No-op metrics implementation for environments without instrumentation.
-pub struct NoopClusterMetrics;
-
-impl ClusterMetrics for NoopClusterMetrics {
-  fn as_any(&self) -> &dyn Any {
-    self
-  }
 }

@@ -9,17 +9,20 @@ pub struct ClusterMetricsConfig {
 
 impl ClusterMetricsConfig {
   /// Creates a new metrics configuration entry.
-  pub fn new(namespace: String, enabled: bool) -> Self {
+  #[must_use]
+  pub const fn new(namespace: String, enabled: bool) -> Self {
     Self { namespace, enabled }
   }
 
   /// Returns the configured namespace for metrics instruments.
+  #[must_use]
   pub fn namespace(&self) -> &str {
     &self.namespace
   }
 
   /// Whether metrics publishing is enabled.
-  pub fn enabled(&self) -> bool {
+  #[must_use]
+  pub const fn enabled(&self) -> bool {
     self.enabled
   }
 }

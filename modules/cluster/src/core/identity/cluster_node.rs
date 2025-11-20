@@ -20,7 +20,7 @@ impl ClusterNode {
 
   /// Returns the node identifier.
   #[must_use]
-  pub fn id(&self) -> &NodeId {
+  pub const fn id(&self) -> &NodeId {
     &self.id
   }
 
@@ -32,13 +32,13 @@ impl ClusterNode {
 
   /// Returns the configured rendezvous weight.
   #[must_use]
-  pub fn weight(&self) -> u32 {
+  pub const fn weight(&self) -> u32 {
     self.weight
   }
 
   /// Indicates whether the node is currently blocked.
   #[must_use]
-  pub fn is_blocked(&self) -> bool {
+  pub const fn is_blocked(&self) -> bool {
     self.blocked
   }
 }

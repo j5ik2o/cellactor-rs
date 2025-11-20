@@ -3,8 +3,6 @@
 #[cfg(test)]
 mod tests;
 
-use alloc::sync::Arc;
-
 use fraktor_actor_rs::core::{
   actor_prim::actor_path::ActorPath, dead_letter::DeadLetterReason, error::SendError, messaging::AnyMessageGeneric,
   serialization::SerializationExtensionGeneric, system::ActorSystemGeneric,
@@ -36,12 +34,19 @@ impl<TB: RuntimeToolbox + 'static> Clone for EndpointReaderGeneric<TB> {
 impl<TB: RuntimeToolbox + 'static> EndpointReaderGeneric<TB> {
   /// Creates a new reader bound to the provided actor system.
   #[must_use]
-  pub fn new(system: ActorSystemGeneric<TB>, serialization: ArcShared<SerializationExtensionGeneric<TB>>) -> Self {
+  pub const fn new(
+    system: ActorSystemGeneric<TB>,
+    serialization: ArcShared<SerializationExtensionGeneric<TB>>,
+  ) -> Self {
     Self { system, serialization }
   }
 
   /// Decodes a remoting envelope into an inbound representation.
-  pub fn decode(&self, envelope: RemotingEnvelope) -> Result<InboundEnvelope<TB>, EndpointReaderError> {
+  ///
+  /// # Errors
+  ///
+  /// Returns `EndpointReaderError::Deserialization` if the message cannot be deserialized.
+  pub fn decode(&self, envelope: &RemotingEnvelope) -> Result<InboundEnvelope<TB>, EndpointReaderError> {
     let recipient = envelope.recipient().clone();
     let remote_node = envelope.remote_node().clone();
     let reply_to = envelope.reply_to().cloned();
@@ -62,8 +67,7 @@ impl<TB: RuntimeToolbox + 'static> EndpointReaderGeneric<TB> {
     serialized: &fraktor_actor_rs::core::serialization::SerializedMessage,
   ) -> Result<AnyMessageGeneric<TB>, fraktor_actor_rs::core::serialization::SerializationError> {
     let payload = self.serialization.deserialize(serialized, None)?;
-    let arc: Arc<dyn core::any::Any + Send + Sync + 'static> = payload.into();
-    let shared = ArcShared::from_arc(arc);
+    let shared = ArcShared::from_arc(payload.into());
     Ok(AnyMessageGeneric::from_erased(shared, None))
   }
 
@@ -73,6 +77,10 @@ impl<TB: RuntimeToolbox + 'static> EndpointReaderGeneric<TB> {
   }
 
   /// Delivers the provided inbound envelope to the actor system.
+  ///
+  /// # Errors
+  ///
+  /// Returns `SendError` if the recipient is not found or delivery fails.
   pub fn deliver(&self, inbound: InboundEnvelope<TB>) -> Result<(), SendError<TB>> {
     let (recipient, message, _reply_to) = inbound.into_delivery_parts();
     let Some(pid) = self.system.pid_by_path(&recipient) else {

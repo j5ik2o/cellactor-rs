@@ -45,19 +45,29 @@ where
   TB: RuntimeToolbox + 'static,
 {
   /// Creates and wires the extension, panicking on unrecoverable errors.
+  ///
+  /// # Panics
+  ///
+  /// Panics if `try_new` fails, typically due to transport initialization errors or missing system
+  /// components.
   #[must_use]
   pub fn new(system: &ActorSystemGeneric<TB>, config: &RemotingExtensionConfig) -> Self {
     Self::try_new(system, config).unwrap_or_else(|error| panic!("failed to initialize remoting extension: {error}"))
   }
 
   /// Attempts to install the extension, returning an error if invariants are violated.
+  ///
+  /// # Errors
+  ///
+  /// Returns `RemotingError` if transport factory fails, system guardian is unavailable, or
+  /// supervisor spawning fails.
   pub fn try_new(system: &ActorSystemGeneric<TB>, config: &RemotingExtensionConfig) -> Result<Self, RemotingError> {
-    let control = RemotingControlHandle::new(system.clone(), config.clone());
+    let control = RemotingControlHandle::new(system.clone(), config);
     let transport = TransportFactory::build(config)?;
     transport.install_backpressure_hook(control.backpressure_hook());
     control.register_transport(transport.clone());
     let guardian = system.system_guardian_ref().ok_or(RemotingError::SystemGuardianUnavailable)?;
-    let supervisor = spawn_endpoint_supervisor(system, &guardian, control.clone())?;
+    let supervisor = spawn_endpoint_supervisor(system, &guardian, &control)?;
     register_shutdown_hook(&guardian, &supervisor)?;
     if config.auto_start() {
       control.start()?;
@@ -83,7 +93,7 @@ impl<TB> Extension<TB> for RemotingExtensionGeneric<TB> where TB: RuntimeToolbox
 fn spawn_endpoint_supervisor<TB>(
   system: &ActorSystemGeneric<TB>,
   guardian: &ActorRefGeneric<TB>,
-  control: RemotingControlHandle<TB>,
+  control: &RemotingControlHandle<TB>,
 ) -> Result<ActorRefGeneric<TB>, RemotingError>
 where
   TB: RuntimeToolbox + 'static, {
@@ -119,7 +129,7 @@ impl<TB> EndpointSupervisorActor<TB>
 where
   TB: RuntimeToolbox + 'static,
 {
-  fn new(control: RemotingControlHandle<TB>, guardian: ActorRefGeneric<TB>) -> Self {
+  const fn new(control: RemotingControlHandle<TB>, guardian: ActorRefGeneric<TB>) -> Self {
     Self { control, guardian }
   }
 

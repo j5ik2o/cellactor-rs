@@ -26,7 +26,7 @@ impl RecordingSpawner {
 
 impl PlacementSpawner<NoStdToolbox> for RecordingSpawner {
   fn spawn(&self, _: &ClusterIdentity, _: PropsGeneric<NoStdToolbox>) -> Result<Pid, PlacementSpawnerError> {
-    self.responses.get(0).cloned().unwrap_or_else(|| Err(PlacementSpawnerError::SpawnFailed))
+    self.responses.first().cloned().unwrap_or(Err(PlacementSpawnerError::SpawnFailed))
   }
 }
 

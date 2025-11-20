@@ -3,7 +3,7 @@
 use alloc::{
   collections::{BTreeMap, VecDeque},
   format,
-  string::String,
+  string::{String, ToString},
   sync::Arc,
   vec::Vec,
 };
@@ -252,7 +252,7 @@ impl<TB: RuntimeToolbox + 'static> EndpointDriver<TB> {
   }
 
   async fn deliver_inbound(&self, envelope: RemotingEnvelope) {
-    match self.reader.decode(envelope) {
+    match self.reader.decode(&envelope) {
       | Ok(inbound) => {
         if let Err(error) = self.reader.deliver(inbound) {
           self.emit_error(format!("failed to deliver inbound envelope: {error:?}"));

@@ -1,10 +1,10 @@
-use alloc::{sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 use core::{
   sync::atomic::{AtomicBool, Ordering},
   time::Duration,
 };
 
-use fraktor_utils_rs::core::runtime_toolbox::RuntimeToolbox;
+use fraktor_utils_rs::core::{runtime_toolbox::RuntimeToolbox, sync::ArcShared};
 
 use crate::core::{
   activation::{
@@ -13,13 +13,16 @@ use crate::core::{
   config::ClusterConfig,
   identity::{ClusterIdentity, IdentityLookupService, NodeId},
   metrics::ClusterMetrics,
-  routing::{PidCache, cluster_error::ClusterError},
+  routing::{ClusterError, PidCache},
 };
 
 /// Resolution result helpers.
-pub mod owner_resolution;
+mod owner_resolution;
 /// Errors raised during owner resolution.
-pub mod resolve_error;
+mod resolve_error;
+
+#[cfg(test)]
+mod tests;
 
 pub use owner_resolution::OwnerResolution;
 pub use resolve_error::ResolveError;
@@ -29,11 +32,11 @@ pub struct ClusterRuntime<TB>
 where
   TB: RuntimeToolbox, {
   config:        ClusterConfig,
-  identity:      Arc<IdentityLookupService<TB>>,
-  activation:    Arc<ActivationLedger<TB>>,
-  metrics:       Arc<dyn ClusterMetrics>,
-  bridge:        Arc<dyn PartitionBridge<TB>>,
-  pid_cache:     Arc<PidCache<TB>>,
+  identity:      ArcShared<IdentityLookupService<TB>>,
+  activation:    ArcShared<ActivationLedger<TB>>,
+  metrics:       ArcShared<dyn ClusterMetrics>,
+  bridge:        ArcShared<dyn PartitionBridge<TB>>,
+  pid_cache:     ArcShared<PidCache<TB>>,
   shutting_down: AtomicBool,
 }
 
@@ -42,19 +45,20 @@ where
   TB: RuntimeToolbox,
 {
   /// Creates a new runtime bundle.
+  #[must_use]
   pub fn new(
     config: ClusterConfig,
-    identity: Arc<IdentityLookupService<TB>>,
-    activation: Arc<ActivationLedger<TB>>,
-    metrics: Arc<dyn ClusterMetrics>,
-    bridge: Arc<dyn PartitionBridge<TB>>,
-    pid_cache: Arc<PidCache<TB>>,
+    identity: ArcShared<IdentityLookupService<TB>>,
+    activation: ArcShared<ActivationLedger<TB>>,
+    metrics: ArcShared<dyn ClusterMetrics>,
+    bridge: ArcShared<dyn PartitionBridge<TB>>,
+    pid_cache: ArcShared<PidCache<TB>>,
   ) -> Self {
     Self { config, identity, activation, metrics, bridge, pid_cache, shutting_down: AtomicBool::new(false) }
   }
 
   /// Returns the runtime configuration.
-  pub fn config(&self) -> &ClusterConfig {
+  pub const fn config(&self) -> &ClusterConfig {
     &self.config
   }
 
@@ -70,7 +74,7 @@ where
 
   /// Returns the metrics sink.
   pub fn metrics(&self) -> &dyn ClusterMetrics {
-    self.metrics.as_ref()
+    &*self.metrics
   }
 
   /// Returns the PID cache handle.
@@ -79,6 +83,10 @@ where
   }
 
   /// Resolves the owner for the provided cluster identity.
+  ///
+  /// # Errors
+  ///
+  /// Returns `ResolveError` if the resolve operation fails.
   pub fn resolve_owner(&self, identity: &ClusterIdentity, requester: &NodeId) -> Result<OwnerResolution, ResolveError> {
     if self.shutting_down.load(Ordering::SeqCst) {
       return Err(ResolveError::ShuttingDown);
@@ -111,10 +119,11 @@ where
     // Linear scan of cache to drop stale entries.
     let identities = self.pid_cache.keys();
     for identity in identities {
-      if let Some(entry) = self.pid_cache.get(&identity) {
-        if entry.topology_hash() != current_hash && self.pid_cache.invalidate(&identity) {
-          removed.push(identity);
-        }
+      if let Some(entry) = self.pid_cache.get(&identity)
+        && entry.topology_hash() != current_hash
+        && self.pid_cache.invalidate(&identity)
+      {
+        removed.push(identity);
       }
     }
     removed
@@ -147,6 +156,10 @@ where
   }
 
   /// Releases and clears cache when ownership changed.
+  ///
+  /// # Errors
+  ///
+  /// Returns `ClusterError::OwnershipChanged` if the lease could not be released.
   pub fn surrender_ownership(
     &self,
     identity: &ClusterIdentity,
@@ -164,15 +177,16 @@ where
   }
 
   /// Dispatches the activation request through the partition bridge.
+  ///
+  /// # Errors
+  ///
+  /// Returns `PartitionBridgeError` if the request could not be dispatched.
   pub fn dispatch_activation_request(&self, request: ActivationRequest<TB>) -> Result<(), PartitionBridgeError> {
     self.bridge.send_activation_request(request)
   }
 
   /// Returns the partition bridge handle.
   pub fn partition_bridge(&self) -> &dyn PartitionBridge<TB> {
-    self.bridge.as_ref()
+    &*self.bridge
   }
 }
-
-#[cfg(test)]
-mod tests;

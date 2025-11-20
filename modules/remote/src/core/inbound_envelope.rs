@@ -20,7 +20,7 @@ pub struct InboundEnvelope<TB: RuntimeToolbox + 'static> {
 impl<TB: RuntimeToolbox + 'static> InboundEnvelope<TB> {
   /// Creates a new inbound envelope.
   #[must_use]
-  pub fn new(
+  pub const fn new(
     recipient: ActorPath,
     remote_node: RemoteNodeId,
     message: AnyMessageGeneric<TB>,
@@ -33,19 +33,19 @@ impl<TB: RuntimeToolbox + 'static> InboundEnvelope<TB> {
 
   /// Returns the intended recipient path.
   #[must_use]
-  pub fn recipient(&self) -> &ActorPath {
+  pub const fn recipient(&self) -> &ActorPath {
     &self.recipient
   }
 
   /// Returns the originating remote node metadata.
   #[must_use]
-  pub fn remote_node(&self) -> &RemoteNodeId {
+  pub const fn remote_node(&self) -> &RemoteNodeId {
     &self.remote_node
   }
 
   /// Returns a borrowed reference to the decoded message.
   #[must_use]
-  pub fn message(&self) -> &AnyMessageGeneric<TB> {
+  pub const fn message(&self) -> &AnyMessageGeneric<TB> {
     &self.message
   }
 
@@ -57,7 +57,7 @@ impl<TB: RuntimeToolbox + 'static> InboundEnvelope<TB> {
 
   /// Returns the optional reply-to actor path provided by the remote sender.
   #[must_use]
-  pub fn reply_to_path(&self) -> Option<&ActorPath> {
+  pub const fn reply_to_path(&self) -> Option<&ActorPath> {
     self.reply_to_path.as_ref()
   }
 
@@ -74,6 +74,7 @@ impl<TB: RuntimeToolbox + 'static> InboundEnvelope<TB> {
   }
 
   /// Consumes the envelope and returns components required for delivery.
+  #[must_use]
   pub fn into_delivery_parts(self) -> (ActorPath, AnyMessageGeneric<TB>, Option<ActorPath>) {
     (self.recipient, self.message, self.reply_to_path)
   }

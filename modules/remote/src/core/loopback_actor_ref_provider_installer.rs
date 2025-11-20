@@ -41,7 +41,7 @@ impl<TB: RuntimeToolbox + 'static> ActorRefProviderInstaller<TB> for LoopbackAct
     };
 
     let writer = ArcShared::new(EndpointWriterGeneric::new(system.clone(), serialization.clone()));
-    let reader = ArcShared::new(EndpointReaderGeneric::new(system.clone(), serialization.clone()));
+    let reader = ArcShared::new(EndpointReaderGeneric::new(system.clone(), serialization));
 
     let Some(extension) = extended.extension_by_type::<RemotingExtensionGeneric<TB>>() else {
       return Err(ActorSystemBuildError::Configuration("remoting extension not installed".into()));
@@ -54,7 +54,7 @@ impl<TB: RuntimeToolbox + 'static> ActorRefProviderInstaller<TB> for LoopbackAct
       .map_err(|error| ActorSystemBuildError::Configuration(format!("{error}")))?;
     let provider = ArcShared::new(provider);
     extended.register_actor_ref_provider(provider.clone());
-    extended.register_remote_watch_hook(provider.clone());
+    extended.register_remote_watch_hook(provider);
 
     // Always register loopback routing for LoopbackActorRefProvider
     let Some(authority) = system.canonical_authority() else {

@@ -1,5 +1,7 @@
 //! Serialization setup utilities for remoting examples and testing.
 
+#![allow(clippy::expect_used)]
+
 use alloc::string::String;
 
 use fraktor_actor_rs::core::serialization::{

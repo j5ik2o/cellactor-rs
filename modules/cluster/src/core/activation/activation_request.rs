@@ -25,7 +25,7 @@ where
 
   /// Returns the cluster identity slated for activation.
   #[must_use]
-  pub fn identity(&self) -> &ClusterIdentity {
+  pub const fn identity(&self) -> &ClusterIdentity {
     &self.identity
   }
 

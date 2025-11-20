@@ -1,9 +1,5 @@
-use std::{
-  boxed::Box,
-  string::String,
-  sync::{Arc, Mutex},
-  vec::Vec,
-};
+#![allow(clippy::disallowed_types)]
+use std::{boxed::Box, string::String, sync::Mutex, vec::Vec};
 
 use fraktor_actor_rs::core::{
   actor_prim::{Actor, ActorContextGeneric, Pid},
@@ -13,13 +9,15 @@ use fraktor_actor_rs::core::{
 };
 use fraktor_cluster_rs::core::{
   activation::{ActivationLedger, ActivationRequest, ActivationResponse, PartitionBridge, PartitionBridgeError},
-  config::{ClusterConfig, ClusterMetricsConfig, HashStrategy, RetryPolicy, TopologyStream, TopologyWatch},
+  config::{
+    ClusterConfig, ClusterMetricsConfig, HashStrategy, RetryPolicy, TopologyWatch, topology_stream::TopologyStream,
+  },
   identity::{ClusterIdentity, ClusterNode, IdentityLookupService, NodeId, TopologySnapshot},
   metrics::ClusterMetrics,
   routing::{PidCache, PidCacheEntry},
   runtime::ClusterRuntime,
 };
-use fraktor_utils_rs::core::runtime_toolbox::NoStdToolbox;
+use fraktor_utils_rs::core::{runtime_toolbox::NoStdToolbox, sync::ArcShared};
 
 #[test]
 fn activation_request_shutdown_flow() {
@@ -32,13 +30,13 @@ fn activation_request_shutdown_flow() {
     .build()
     .expect("config");
 
-  let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
+  let identity_service = ArcShared::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
   identity_service.update_topology(&sample_snapshot());
-  let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
-  let metrics_impl = Arc::new(MockMetrics::default());
-  let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
-  let bridge = Arc::new(MockBridge::default());
-  let pid_cache = Arc::new(PidCache::new());
+  let ledger = ArcShared::new(ActivationLedger::<NoStdToolbox>::new());
+  let metrics_impl = ArcShared::new(MockMetrics::default());
+  let metrics: ArcShared<dyn ClusterMetrics> = metrics_impl.clone();
+  let bridge = ArcShared::new(MockBridge::default());
+  let pid_cache = ArcShared::new(PidCache::new());
 
   let runtime =
     ClusterRuntime::new(config, identity_service.clone(), ledger.clone(), metrics, bridge.clone(), pid_cache.clone());

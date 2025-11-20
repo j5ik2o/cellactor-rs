@@ -62,7 +62,7 @@ pub struct PhiFailureDetector {
 impl PhiFailureDetector {
   /// Creates a detector with the provided configuration.
   #[must_use]
-  pub fn new(config: PhiFailureDetectorConfig) -> Self {
+  pub const fn new(config: PhiFailureDetectorConfig) -> Self {
     Self { config, entries: BTreeMap::new() }
   }
 

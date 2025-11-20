@@ -74,7 +74,7 @@ impl EndpointRegistry {
 }
 
 #[allow(dead_code)]
-fn map_state(state: &AssociationState) -> AuthorityState {
+const fn map_state(state: &AssociationState) -> AuthorityState {
   match state {
     | AssociationState::Connected { .. } => AuthorityState::Connected,
     | AssociationState::Quarantined { resume_at, .. } | AssociationState::Gated { resume_at } => {
@@ -85,7 +85,7 @@ fn map_state(state: &AssociationState) -> AuthorityState {
 }
 
 impl EndpointEntry {
-  fn new() -> Self {
+  const fn new() -> Self {
     Self {
       state:             AssociationState::Unassociated,
       deferred:          Vec::new(),

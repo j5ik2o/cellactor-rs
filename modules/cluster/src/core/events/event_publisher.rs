@@ -7,6 +7,9 @@ use fraktor_utils_rs::core::{
 
 use crate::core::events::cluster_event::ClusterEvent;
 
+#[cfg(test)]
+mod tests;
+
 /// Lightweight publisher that queues cluster events before flushing to EventStream.
 pub struct ClusterEventPublisher<TB>
 where
@@ -19,6 +22,7 @@ where
   TB: RuntimeToolbox,
 {
   /// Creates a new event publisher with an empty queue.
+  #[must_use]
   pub fn new() -> Self {
     Self { queue: <TB::MutexFamily as SyncMutexFamily>::create(Vec::new()) }
   }
@@ -34,5 +38,11 @@ where
   }
 }
 
-#[cfg(test)]
-mod tests;
+impl<TB> Default for ClusterEventPublisher<TB>
+where
+  TB: RuntimeToolbox,
+{
+  fn default() -> Self {
+    Self::new()
+  }
+}

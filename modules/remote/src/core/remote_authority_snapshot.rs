@@ -33,7 +33,7 @@ impl RemoteAuthoritySnapshot {
 
   /// Returns the recorded state.
   #[must_use]
-  pub fn state(&self) -> &AuthorityState {
+  pub const fn state(&self) -> &AuthorityState {
     &self.state
   }
 

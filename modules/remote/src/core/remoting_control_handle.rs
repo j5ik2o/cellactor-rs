@@ -1,5 +1,7 @@
 //! Concrete implementation of [`RemotingControl`] backed by the actor system.
 
+#[cfg(feature = "tokio-transport")]
+use alloc::format;
 use alloc::{
   string::{String, ToString},
   vec::Vec,
@@ -51,7 +53,7 @@ where
   TB: RuntimeToolbox + 'static,
 {
   /// Creates a new handle bound to the provided actor system.
-  pub(crate) fn new(system: ActorSystemGeneric<TB>, config: RemotingExtensionConfig) -> Self {
+  pub(crate) fn new(system: ActorSystemGeneric<TB>, config: &RemotingExtensionConfig) -> Self {
     let mut listeners: Vec<ArcShared<dyn RemotingBackpressureListener>> = Vec::new();
     for listener in config.backpressure_listeners() {
       listeners.push(listener.clone());
@@ -232,6 +234,10 @@ where
     self.recorder.record_backpressure(authority.to_string(), signal, correlation_id, millis);
   }
 
+  #[cfg_attr(
+    not(feature = "tokio-transport"),
+    allow(clippy::unused_self, clippy::unnecessary_wraps, clippy::missing_const_for_fn)
+  )]
   fn try_bootstrap_runtime(&self) -> Result<(), RemotingError> {
     #[cfg(feature = "tokio-transport")]
     {
@@ -284,11 +290,11 @@ impl RemotingLifecycleState {
     Self { phase: LifecyclePhase::Idle }
   }
 
-  fn is_running(&self) -> bool {
+  const fn is_running(&self) -> bool {
     matches!(self.phase, LifecyclePhase::Running)
   }
 
-  fn ensure_running(&self) -> Result<(), RemotingError> {
+  const fn ensure_running(&self) -> Result<(), RemotingError> {
     match self.phase {
       | LifecyclePhase::Running => Ok(()),
       | LifecyclePhase::Idle => Err(RemotingError::NotStarted),
@@ -296,7 +302,7 @@ impl RemotingLifecycleState {
     }
   }
 
-  fn transition_to_start(&mut self) -> Result<(), RemotingError> {
+  const fn transition_to_start(&mut self) -> Result<(), RemotingError> {
     match self.phase {
       | LifecyclePhase::Idle => {
         self.phase = LifecyclePhase::Running;
@@ -307,7 +313,7 @@ impl RemotingLifecycleState {
     }
   }
 
-  fn transition_to_shutdown(&mut self) -> Result<(), RemotingError> {
+  const fn transition_to_shutdown(&mut self) -> Result<(), RemotingError> {
     match self.phase {
       | LifecyclePhase::Idle | LifecyclePhase::Running => {
         self.phase = LifecyclePhase::Stopped;
@@ -317,7 +323,7 @@ impl RemotingLifecycleState {
     }
   }
 
-  fn mark_shutdown(&mut self) -> bool {
+  const fn mark_shutdown(&mut self) -> bool {
     if matches!(self.phase, LifecyclePhase::Stopped) {
       false
     } else {

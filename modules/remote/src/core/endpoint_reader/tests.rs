@@ -114,7 +114,7 @@ fn decode_round_trip_returns_inbound_envelope() {
   writer.enqueue(outbound).expect("enqueue");
   let remoting_envelope = writer.try_next().expect("serialize").expect("envelope");
 
-  let inbound = reader.decode(remoting_envelope).expect("decode succeeds");
+  let inbound = reader.decode(&remoting_envelope).expect("decode succeeds");
 
   assert_eq!(inbound.recipient().to_relative_string(), "/user/user/svc");
   assert_eq!(inbound.remote_node().system(), "remote-system");
@@ -138,7 +138,7 @@ fn deserialization_failure_produces_dead_letter_error() {
     crate::core::OutboundPriority::User,
   );
 
-  let result: Result<InboundEnvelope<_>, _> = reader.decode(envelope);
+  let result: Result<InboundEnvelope<_>, _> = reader.decode(&envelope);
   assert!(result.is_err());
   assert!(
     system

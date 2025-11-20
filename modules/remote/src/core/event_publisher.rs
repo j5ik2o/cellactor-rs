@@ -30,7 +30,7 @@ impl<TB: RuntimeToolbox + 'static> Clone for EventPublisherGeneric<TB> {
 impl<TB: RuntimeToolbox + 'static> EventPublisherGeneric<TB> {
   /// Creates a new publisher bound to the provided actor system.
   #[must_use]
-  pub fn new(system: ActorSystemGeneric<TB>) -> Self {
+  pub const fn new(system: ActorSystemGeneric<TB>) -> Self {
     Self { system }
   }
 

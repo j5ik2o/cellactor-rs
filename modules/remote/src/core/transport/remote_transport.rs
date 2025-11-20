@@ -15,12 +15,25 @@ pub trait RemoteTransport: Send + Sync + 'static {
   fn scheme(&self) -> &str;
 
   /// Binds a listener to the specified authority.
+  ///
+  /// # Errors
+  ///
+  /// Returns `TransportError` if binding fails due to address conflicts or transport
+  /// unavailability.
   fn spawn_listener(&self, bind: &TransportBind) -> Result<TransportHandle, TransportError>;
 
   /// Opens or reuses an outbound channel targeting the specified endpoint.
+  ///
+  /// # Errors
+  ///
+  /// Returns `TransportError` if channel opening fails due to network or configuration issues.
   fn open_channel(&self, endpoint: &TransportEndpoint) -> Result<TransportChannel, TransportError>;
 
   /// Sends the provided payload over the channel, embedding the correlation id.
+  ///
+  /// # Errors
+  ///
+  /// Returns `TransportError` if the send operation fails due to transport or network errors.
   fn send(
     &self,
     channel: &TransportChannel,

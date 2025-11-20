@@ -35,7 +35,7 @@ impl RemotingMetric {
 
   /// Returns the metric kind.
   #[must_use]
-  pub fn kind(&self) -> &FlightMetricKind {
+  pub const fn kind(&self) -> &FlightMetricKind {
     &self.kind
   }
 

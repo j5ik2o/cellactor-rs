@@ -34,7 +34,7 @@ pub enum AssociationState {
 impl AssociationState {
   /// Returns `true` when the state is connected.
   #[must_use]
-  pub fn is_connected(&self) -> bool {
+  pub const fn is_connected(&self) -> bool {
     matches!(self, Self::Connected { .. })
   }
 }

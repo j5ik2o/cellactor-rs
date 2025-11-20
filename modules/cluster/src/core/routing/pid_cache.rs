@@ -1,46 +1,18 @@
 use alloc::vec::Vec;
 
-use fraktor_actor_rs::core::actor_prim::Pid;
 use fraktor_utils_rs::core::{
   runtime_toolbox::{RuntimeToolbox, SyncMutexFamily, ToolboxMutex},
   sync::sync_mutex_like::SyncMutexLike,
 };
 
+mod pid_cache_entry;
+
+#[cfg(test)]
+mod tests;
+
+pub use pid_cache_entry::PidCacheEntry;
+
 use crate::core::identity::{ClusterIdentity, NodeId};
-
-/// Cached PID entry with owner metadata.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PidCacheEntry {
-  pid:           Pid,
-  owner:         NodeId,
-  topology_hash: u64,
-}
-
-impl PidCacheEntry {
-  /// Builds a new cache entry.
-  #[must_use]
-  pub const fn new(pid: Pid, owner: NodeId, topology_hash: u64) -> Self {
-    Self { pid, owner, topology_hash }
-  }
-
-  /// Returns cached PID reference.
-  #[must_use]
-  pub const fn pid(&self) -> Pid {
-    self.pid
-  }
-
-  /// Returns owning node.
-  #[must_use]
-  pub const fn owner(&self) -> &NodeId {
-    &self.owner
-  }
-
-  /// Returns topology hash.
-  #[must_use]
-  pub const fn topology_hash(&self) -> u64 {
-    self.topology_hash
-  }
-}
 
 type CacheMap = hashbrown::HashMap<ClusterIdentity, PidCacheEntry, rapidhash::RapidBuildHasher>;
 
@@ -122,6 +94,3 @@ where
     Self::new()
   }
 }
-
-#[cfg(test)]
-mod tests;
