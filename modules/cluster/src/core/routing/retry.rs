@@ -20,12 +20,13 @@ pub struct RetryPolicyRunner {
 
 impl RetryPolicyRunner {
   /// Creates a new runner for the given policy.
+  #[must_use]
   pub fn new(policy: RetryPolicy) -> Self {
     Self { backoff: policy.initial_backoff(), attempt: 0, policy }
   }
 
   /// Evaluates the next retry decision.
-  pub fn next(&mut self) -> RetryOutcome {
+  pub fn next_outcome(&mut self) -> RetryOutcome {
     self.attempt += 1;
     if self.attempt > self.policy.max_attempts().get() {
       return RetryOutcome::GiveUp;
@@ -41,5 +42,13 @@ impl RetryPolicyRunner {
       | RetryJitter::Full => backoff / 2,
       | RetryJitter::Decorrelated => backoff + Duration::from_millis(10),
     }
+  }
+}
+
+impl Iterator for RetryPolicyRunner {
+  type Item = RetryOutcome;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    Some(self.next_outcome())
   }
 }

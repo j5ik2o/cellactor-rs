@@ -37,6 +37,12 @@ where
     Self { state: <TB::MutexFamily as SyncMutexFamily>::create(state) }
   }
 
+  /// Returns true when no leases are tracked.
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
+    self.state.lock().entries.is_empty()
+  }
+
   /// Attempts to acquire a lease for the provided identity.
   pub fn acquire(
     &self,
@@ -129,6 +135,14 @@ where
   }
 }
 
+impl<TB> Default for ActivationLedger<TB>
+where
+  TB: RuntimeToolbox,
+{
+  fn default() -> Self {
+    Self::new()
+  }
+}
 impl Default for LedgerState {
   fn default() -> Self {
     Self { sequence: 0, entries: LeaseMap::with_hasher(RapidBuildHasher::default()) }

@@ -28,9 +28,9 @@ where
   }
 
   /// Applies the latest topology snapshot to the ring.
-  pub fn update_topology(&self, snapshot: TopologySnapshot) {
+  pub fn update_topology(&self, snapshot: &TopologySnapshot) {
     let mut guard = self.ring.lock();
-    guard.rebuild(&snapshot);
+    guard.rebuild(snapshot);
   }
 
   /// Selects an owner node for the provided identity.

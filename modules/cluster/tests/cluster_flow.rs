@@ -33,7 +33,7 @@ fn activation_request_shutdown_flow() {
     .expect("config");
 
   let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
-  identity_service.update_topology(sample_snapshot());
+  identity_service.update_topology(&sample_snapshot());
   let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
   let metrics_impl = Arc::new(MockMetrics::default());
   let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
@@ -67,7 +67,7 @@ fn activation_request_shutdown_flow() {
   );
 
   // トポロジ変更でキャッシュが無効化されることを検証
-  identity_service.update_topology(TopologySnapshot::new(100, vec![ClusterNode::new(
+  identity_service.update_topology(&TopologySnapshot::new(100, vec![ClusterNode::new(
     NodeId::new("node-c"),
     "10.0.0.3",
     1,

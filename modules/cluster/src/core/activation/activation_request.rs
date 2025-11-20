@@ -19,7 +19,7 @@ where
 {
   /// Creates a new activation request from the identity, lease, and props.
   #[must_use]
-  pub fn new(identity: ClusterIdentity, lease: ActivationLease, props: PropsGeneric<TB>) -> Self {
+  pub const fn new(identity: ClusterIdentity, lease: ActivationLease, props: PropsGeneric<TB>) -> Self {
     Self { identity, lease, props }
   }
 
@@ -37,7 +37,7 @@ where
 
   /// Returns the activation lease granted by the runtime.
   #[must_use]
-  pub fn lease(&self) -> &ActivationLease {
+  pub const fn lease(&self) -> &ActivationLease {
     &self.lease
   }
 
@@ -49,7 +49,7 @@ where
 
   /// Returns the props used to spawn the actor.
   #[must_use]
-  pub fn props(&self) -> &PropsGeneric<TB> {
+  pub const fn props(&self) -> &PropsGeneric<TB> {
     &self.props
   }
 

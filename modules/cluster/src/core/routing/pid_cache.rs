@@ -18,22 +18,26 @@ pub struct PidCacheEntry {
 
 impl PidCacheEntry {
   /// Builds a new cache entry.
-  pub fn new(pid: Pid, owner: NodeId, topology_hash: u64) -> Self {
+  #[must_use]
+  pub const fn new(pid: Pid, owner: NodeId, topology_hash: u64) -> Self {
     Self { pid, owner, topology_hash }
   }
 
   /// Returns cached PID reference.
-  pub fn pid(&self) -> Pid {
+  #[must_use]
+  pub const fn pid(&self) -> Pid {
     self.pid
   }
 
   /// Returns owning node.
-  pub fn owner(&self) -> &NodeId {
+  #[must_use]
+  pub const fn owner(&self) -> &NodeId {
     &self.owner
   }
 
   /// Returns topology hash.
-  pub fn topology_hash(&self) -> u64 {
+  #[must_use]
+  pub const fn topology_hash(&self) -> u64 {
     self.topology_hash
   }
 }
@@ -52,6 +56,7 @@ where
   TB: RuntimeToolbox,
 {
   /// Creates an empty cache.
+  #[must_use]
   pub fn new() -> Self {
     let map = CacheMap::with_hasher(rapidhash::RapidBuildHasher::default());
     Self { entries: <TB::MutexFamily as SyncMutexFamily>::create(map) }
@@ -100,6 +105,21 @@ where
   pub fn clear(&self) {
     let mut guard = self.entries.lock();
     guard.clear();
+  }
+
+  /// Returns true when the cache holds no entries.
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
+    self.entries.lock().is_empty()
+  }
+}
+
+impl<TB> Default for PidCache<TB>
+where
+  TB: RuntimeToolbox,
+{
+  fn default() -> Self {
+    Self::new()
   }
 }
 

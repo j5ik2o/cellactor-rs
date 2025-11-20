@@ -15,8 +15,8 @@ fn policy() -> RetryPolicy {
 #[test]
 fn runner_retries_until_max_attempts() {
     let mut runner = RetryPolicyRunner::new(policy());
-    assert!(matches!(runner.next(), RetryOutcome::RetryAfter(_)));
-    assert!(matches!(runner.next(), RetryOutcome::RetryAfter(_)));
-    assert!(matches!(runner.next(), RetryOutcome::RetryAfter(_)));
-    assert!(matches!(runner.next(), RetryOutcome::GiveUp));
+    assert!(matches!(runner.next_outcome(), RetryOutcome::RetryAfter(_)));
+    assert!(matches!(runner.next_outcome(), RetryOutcome::RetryAfter(_)));
+    assert!(matches!(runner.next_outcome(), RetryOutcome::RetryAfter(_)));
+    assert!(matches!(runner.next_outcome(), RetryOutcome::GiveUp));
 }

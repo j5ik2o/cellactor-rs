@@ -58,10 +58,10 @@ where
             match self.runtime.resolve(identity, requester) {
                 Ok(entry) => {
                     self.cache.insert(identity.clone(), entry.clone());
-                     self.metrics.record_resolve_duration(identity, Duration::ZERO);
+                    self.metrics.record_resolve_duration(identity, Duration::ZERO);
                     return Ok(entry);
                 }
-                Err(err) => match runner.next() {
+                Err(err) => match runner.next_outcome() {
                     RetryOutcome::RetryAfter(_) => {
                         self.cache.invalidate(identity);
                         self.metrics.record_retry(identity);

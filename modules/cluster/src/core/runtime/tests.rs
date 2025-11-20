@@ -116,7 +116,7 @@ fn resolve_owner_acquires_lease() {
   let requester = NodeId::new("req");
 
   let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
-  identity_service.update_topology(sample_snapshot());
+  identity_service.update_topology(&sample_snapshot());
   let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
   let metrics_impl = Arc::new(TestMetrics::default());
   let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
@@ -143,7 +143,7 @@ fn resolve_owner_acquires_lease() {
 fn handle_blocked_node_revokes_leases() {
   let config = sample_config();
   let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
-  identity_service.update_topology(sample_snapshot());
+  identity_service.update_topology(&sample_snapshot());
   let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
   let metrics_impl = Arc::new(TestMetrics::default());
   let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
@@ -172,7 +172,7 @@ fn handle_blocked_node_revokes_leases() {
 fn begin_shutdown_prevents_new_resolves() {
   let config = sample_config();
   let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
-  identity_service.update_topology(sample_snapshot());
+  identity_service.update_topology(&sample_snapshot());
   let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
   let metrics_impl = Arc::new(TestMetrics::default());
   let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
@@ -197,7 +197,7 @@ fn begin_shutdown_prevents_new_resolves() {
 fn dispatches_activation_request_via_bridge() {
   let config = sample_config();
   let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
-  identity_service.update_topology(sample_snapshot());
+  identity_service.update_topology(&sample_snapshot());
   let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
   let metrics_impl = Arc::new(TestMetrics::default());
   let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
