@@ -58,6 +58,7 @@
   - _完了条件: 3.x 子タスク完了かつ Request/RequestFuture の統合テストが green_
 
 - [x] 3.1 PidCache と IdentityLookup 統合
+- [x] 3.2 リトライポリシーと RequestFuture 実装
   - std では dashmap + ArcSwap、no_std では shard 付き ToolboxMutex map を実装し、ClusterRuntime resolve と連携
   - Cache miss/hit/invalidated のテストを用意し、BlockList 連動が反映されることを確認
   - _対応要件: 3.1, 3.5_
@@ -71,7 +72,7 @@
   - _依存タスク: 3.1_
   - _完了条件: Retry シナリオの統合テストとメトリクス発火が確認できること_
 
-- [ ] 3.3 Routing 統合テストを追加
+- [x] 3.3 Routing 統合テストを追加
   - ClusterContext 経由で複数 kind/identity へ Request/RequestFuture を投げ、成功/リトライ/BlockList など代表ケースを検証
   - ClusterError (Timeout/Blocked/ShuttingDown) が適切に伝播することを assertion
   - _対応要件: 3.1-3.5_
