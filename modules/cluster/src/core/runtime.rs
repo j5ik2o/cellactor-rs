@@ -1,8 +1,8 @@
-use alloc::sync::Arc;
+use alloc::{sync::Arc, vec::Vec};
 
 use fraktor_utils_rs::core::runtime_toolbox::RuntimeToolbox;
 
-use crate::core::activation::{ActivationLedger, LedgerError};
+use crate::core::activation::{ActivationLease, ActivationLedger, ActivationRequest, PartitionBridge, PartitionBridgeError, LedgerError};
 use crate::core::config::ClusterConfig;
 use crate::core::identity::{ClusterIdentity, IdentityLookupService, NodeId};
 use crate::core::metrics::ClusterMetrics;
@@ -24,6 +24,7 @@ where
     identity: Arc<IdentityLookupService<TB>>,
     activation: Arc<ActivationLedger<TB>>,
     metrics: Arc<dyn ClusterMetrics>,
+    bridge: Arc<dyn PartitionBridge<TB>>,
 }
 
 impl<TB> ClusterRuntime<TB>
@@ -36,12 +37,14 @@ where
         identity: Arc<IdentityLookupService<TB>>,
         activation: Arc<ActivationLedger<TB>>,
         metrics: Arc<dyn ClusterMetrics>,
+        bridge: Arc<dyn PartitionBridge<TB>>,
     ) -> Self {
         Self {
             config,
             identity,
             activation,
             metrics,
+            bridge,
         }
     }
 
@@ -83,6 +86,24 @@ where
             Ok(lease) => Ok(OwnerResolution::new(owner, lease)),
             Err(LedgerError::AlreadyOwned { existing }) => Err(ResolveError::LeaseConflict { existing }),
         }
+    }
+
+    /// Handles block list notification for the provided node.
+    pub fn handle_blocked_node(&self, node: &NodeId) -> Vec<(ClusterIdentity, ActivationLease)> {
+        self.activation.revoke_owner(node)
+    }
+
+    /// Dispatches the activation request through the partition bridge.
+    pub fn dispatch_activation_request(
+        &self,
+        request: ActivationRequest<TB>,
+    ) -> Result<(), PartitionBridgeError> {
+        self.bridge.send_activation_request(request)
+    }
+
+    /// Returns the partition bridge handle.
+    pub fn partition_bridge(&self) -> &dyn PartitionBridge<TB> {
+        self.bridge.as_ref()
     }
 }
 
