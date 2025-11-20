@@ -1,6 +1,6 @@
 # 実装計画
 
-- [ ] 1. ClusterExtension 基盤とハッシュリングを実装
+- [x] 1. ClusterExtension 基盤とハッシュリングを実装
   - _対応要件: 1.1, 1.2, 1.3, 1.4, 1.5_
   - _依存タスク: -_
   - _完了条件: 1.x 系子タスク完了かつ nightly ツールチェーンで PoC が green_
@@ -26,7 +26,7 @@
   - _依存タスク: 1.2_
   - _完了条件: BlockList シナリオの統合テストで古い PID が拒否されること_
 
-- [ ] 2. Activation と Placement の制御経路を実装
+- [x] 2. Activation と Placement の制御経路を実装
   - _対応要件: 2.1, 2.2, 2.3, 2.4, 2.5_
   - _依存タスク: 1.1-1.3_
   - _完了条件: 2.x 子タスク完了かつ Placement 経路の統合テストが green_
@@ -52,7 +52,7 @@
   - _依存タスク: 2.2_
   - _完了条件: Graceful Shutdown テストが green で、ログに release 完了が出力されること_
 
-- [ ] 3. ClusterContext とリトライ/Routing を実装
+- [x] 3. ClusterContext とリトライ/Routing を実装
   - _対応要件: 3.1, 3.2, 3.3, 3.4, 3.5_
   - _依存タスク: 1.x, 2.x_
   - _完了条件: 3.x 子タスク完了かつ Request/RequestFuture の統合テストが green_
@@ -65,7 +65,7 @@
   - _依存タスク: 1.2, 1.3_
   - _完了条件: PidCache の単体テストが green で 1M identity ベンチが基準値内_
 
-- [ ] 3.2 リトライポリシーと RequestFuture 実装
+- [x] 3.2 リトライポリシーと RequestFuture 実装
   - RetryPolicy に指数バックオフ＋ jitter を実装し、Timeout/DeadLetter 時に PidCache invalidation を行う
   - RequestFuture が Context timeout を監視し、エラー時に ClusterMetrics へ記録する
   - _対応要件: 3.2, 3.3_
@@ -79,7 +79,7 @@
   - _依存タスク: 3.2_
   - _完了条件: 統合テスト suite が green で、CI 上で実行されること_
 
-- [ ] 4. 観測性・メトリクスと最終統合
+- [x] 4. 観測性・メトリクスと最終統合
   - _対応要件: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _依存タスク: 1-3_
   - _完了条件: 4.x 子タスク完了＋CI で EventStream/metrics テストが green_
@@ -98,7 +98,7 @@
   - _依存タスク: 4.1_
   - _完了条件: メトリクス E2E テストが green でメトリクス名が docs と一致
 
-- [ ] 4.3 システム統合テストを実施
+- [x] 4.3 システム統合テストを実施
   - in-memory ClusterProvider で Joined/Left/Blocked をシミュレートし、Activation → Request → Shutdown までを通しで検証
   - Bazel/CI workflow に統合テストジョブを追加し、hash_rings PoC + no_std ベンチも自動実行
   - _対応要件: 全要件 (1.1-4.5)_
