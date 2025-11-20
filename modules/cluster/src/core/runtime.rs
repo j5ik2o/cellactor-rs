@@ -4,6 +4,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use fraktor_utils_rs::core::runtime_toolbox::RuntimeToolbox;
 
 use crate::core::activation::{ActivationLease, ActivationLedger, ActivationRequest, PartitionBridge, PartitionBridgeError, LedgerError};
+use crate::core::routing::PidCache;
 use crate::core::config::ClusterConfig;
 use crate::core::identity::{ClusterIdentity, IdentityLookupService, NodeId};
 use crate::core::metrics::ClusterMetrics;
@@ -26,6 +27,7 @@ where
     activation: Arc<ActivationLedger<TB>>,
     metrics: Arc<dyn ClusterMetrics>,
     bridge: Arc<dyn PartitionBridge<TB>>,
+    pid_cache: Arc<PidCache<TB>>,
     shutting_down: AtomicBool,
 }
 
@@ -40,6 +42,7 @@ where
         activation: Arc<ActivationLedger<TB>>,
         metrics: Arc<dyn ClusterMetrics>,
         bridge: Arc<dyn PartitionBridge<TB>>,
+        pid_cache: Arc<PidCache<TB>>,
     ) -> Self {
         Self {
             config,
@@ -47,6 +50,7 @@ where
             activation,
             metrics,
             bridge,
+            pid_cache,
             shutting_down: AtomicBool::new(false),
         }
     }
@@ -69,6 +73,11 @@ where
     /// Returns the metrics sink.
     pub fn metrics(&self) -> &dyn ClusterMetrics {
         self.metrics.as_ref()
+    }
+
+    /// Returns the PID cache handle.
+    pub fn pid_cache(&self) -> &PidCache<TB> {
+        &self.pid_cache
     }
 
     /// Resolves the owner for the provided cluster identity.
@@ -96,12 +105,14 @@ where
 
     /// Handles block list notification for the provided node.
     pub fn handle_blocked_node(&self, node: &NodeId) -> Vec<(ClusterIdentity, ActivationLease)> {
+        self.pid_cache.invalidate_node(node);
         self.activation.revoke_owner(node)
     }
 
     /// Begins graceful shutdown by rejecting future resolves and releasing leases.
     pub fn begin_shutdown(&self) -> Vec<(ClusterIdentity, ActivationLease)> {
         self.shutting_down.store(true, Ordering::SeqCst);
+        self.pid_cache.clear();
         self.activation.release_all()
     }
 

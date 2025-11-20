@@ -10,5 +10,7 @@ pub mod activation;
 pub mod identity;
 /// Metrics abstractions and sinks.
 pub mod metrics;
+/// Routing helpers such as PID caches.
+pub mod routing;
 /// Placement coordination and activation drivers.
 pub mod placement;

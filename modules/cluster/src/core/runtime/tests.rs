@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::any::TypeId;
 use core::ptr;
 
-use fraktor_actor_rs::core::actor_prim::{Actor, ActorContextGeneric};
+use fraktor_actor_rs::core::actor_prim::{Actor, ActorContextGeneric, Pid};
 use fraktor_actor_rs::core::messaging::AnyMessageViewGeneric;
 use fraktor_actor_rs::core::props::PropsGeneric;
 use fraktor_actor_rs::core::error::ActorError;
@@ -18,6 +18,7 @@ use crate::core::config::{
 };
 use crate::core::identity::{ClusterIdentity, ClusterNode, IdentityLookupService, NodeId, TopologySnapshot};
 use crate::core::metrics::ClusterMetrics;
+use crate::core::routing::{PidCache, PidCacheEntry};
 use crate::core::runtime::{ClusterRuntime, ResolveError};
 
 #[derive(Clone)]
@@ -60,7 +61,15 @@ fn runtime_retains_dependencies() {
     let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
 
     let bridge = Arc::new(TestBridge::default());
-    let runtime = ClusterRuntime::new(config.clone(), identity.clone(), activation.clone(), metrics.clone(), bridge);
+    let pid_cache = Arc::new(PidCache::new());
+    let runtime = ClusterRuntime::new(
+        config.clone(),
+        identity.clone(),
+        activation.clone(),
+        metrics.clone(),
+        bridge,
+        pid_cache,
+    );
 
     assert_eq!(runtime.config().system_name(), config.system_name());
     assert!(ptr::eq(Arc::as_ptr(&identity), runtime.identity() as *const _));
@@ -83,7 +92,8 @@ fn resolve_owner_acquires_lease() {
     let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
 
     let bridge = Arc::new(TestBridge::default());
-    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge);
+    let pid_cache = Arc::new(PidCache::new());
+    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge, pid_cache);
 
     let first = runtime
         .resolve_owner(&identity, &requester)
@@ -109,10 +119,15 @@ fn handle_blocked_node_revokes_leases() {
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
     let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
     let bridge = Arc::new(TestBridge::default());
-    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge);
+    let pid_cache = Arc::new(PidCache::new());
+    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge, pid_cache.clone());
 
     let identity = ClusterIdentity::new("echo", "id-1");
     let requester = NodeId::new("req");
+    pid_cache.insert(
+        identity.clone(),
+        PidCacheEntry::new(Pid::new(9, 0), NodeId::new("node-b"), 99),
+    );
     let resolution = runtime
         .resolve_owner(&identity, &requester)
         .expect("resolution");
@@ -124,6 +139,7 @@ fn handle_blocked_node_revokes_leases() {
     assert_eq!(revoked[0].0, identity);
     assert!(matches!(revoked[0].1.status(), LeaseStatus::Revoked));
     assert!(ledger.get(&identity).is_none());
+    assert!(pid_cache.get(&identity).is_none());
 }
 
 #[test]
@@ -134,10 +150,15 @@ fn begin_shutdown_prevents_new_resolves() {
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
     let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
     let bridge = Arc::new(TestBridge::default());
-    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge);
+    let pid_cache = Arc::new(PidCache::new());
+    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge, pid_cache.clone());
 
     let identity = ClusterIdentity::new("echo", "a");
     let requester = NodeId::new("req");
+    pid_cache.insert(
+        identity.clone(),
+        PidCacheEntry::new(Pid::new(1, 0), NodeId::new("node-a"), 1),
+    );
 
     runtime.begin_shutdown();
 
@@ -146,6 +167,7 @@ fn begin_shutdown_prevents_new_resolves() {
         .expect_err("shutdown should block resolves");
     assert!(matches!(err, ResolveError::ShuttingDown));
     assert!(ledger.release_all().is_empty());
+    assert!(pid_cache.get(&identity).is_none());
 }
 
 #[test]
@@ -156,7 +178,8 @@ fn dispatches_activation_request_via_bridge() {
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
     let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
     let bridge = Arc::new(TestBridge::default());
-    let runtime = ClusterRuntime::new(config, identity_service, ledger, metrics, bridge.clone());
+    let pid_cache = Arc::new(PidCache::new());
+    let runtime = ClusterRuntime::new(config, identity_service, ledger, metrics, bridge.clone(), pid_cache);
 
     let identity = ClusterIdentity::new("echo", "req");
     let lease = ActivationLease::new(LeaseId::new(1), NodeId::new("node-a"), 2, LeaseStatus::Active);

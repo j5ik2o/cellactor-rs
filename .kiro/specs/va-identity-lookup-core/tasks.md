@@ -57,7 +57,7 @@
   - _依存タスク: 1.x, 2.x_
   - _完了条件: 3.x 子タスク完了かつ Request/RequestFuture の統合テストが green_
 
-- [ ] 3.1 PidCache と IdentityLookup 統合
+- [x] 3.1 PidCache と IdentityLookup 統合
   - std では dashmap + ArcSwap、no_std では shard 付き ToolboxMutex map を実装し、ClusterRuntime resolve と連携
   - Cache miss/hit/invalidated のテストを用意し、BlockList 連動が反映されることを確認
   - _対応要件: 3.1, 3.5_
