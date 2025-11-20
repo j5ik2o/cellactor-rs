@@ -4,14 +4,14 @@
 pub mod cluster_identity;
 /// Cluster node metadata used by rendezvous hashing.
 pub mod cluster_node;
-/// Unique node identifier newtype.
-pub mod node_id;
-/// Snapshot of current topology and members.
-pub mod topology_snapshot;
 /// Hash ring provider that selects owners deterministically.
 pub mod hash_ring_provider;
 /// Core identity lookup service implementation placeholder.
 pub mod identity_lookup_service;
+/// Unique node identifier newtype.
+pub mod node_id;
+/// Snapshot of current topology and members.
+pub mod topology_snapshot;
 
 pub use cluster_identity::ClusterIdentity;
 pub use cluster_node::ClusterNode;

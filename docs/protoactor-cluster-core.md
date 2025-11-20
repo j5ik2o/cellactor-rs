@@ -47,3 +47,11 @@
 - PubSub/Broadcast も Grain 呼び出しで実現しているため、TopicActor のような「状態をクラスタ内で冪等に再構築できる仮想アクター」を汎用的に作れる仕組みがあると互換性を保ちやすい。
 - Proto メッセージ群（cluster.proto / gossip.proto / grain.proto）を Rust 版にも取り込み、互換線を揃えることで将来的な異言語連携を見据えられる。
 
+  1. Bootstrap フェーズ（今回の spec）
+     ClusterExtension インストール、Topology 監視、Placement/Routing/観測の骨格を整える。
+  2. Provisioning フェーズ
+     ClusterProvider（in-memory、Consul、K8sなど）実装、PlacementSupervisor/PartitionManager への接続、Remoting 連携。
+  3. Routing/API フェーズ
+     ClusterContext Request/RequestFuture API を公開し、PID キャッシュと RetryPolicy をアプリから利用できるようにする。
+  4. Observability/Operations フェーズ
+     EventStream/metrics を OTel や CI に統合し、ClusterAdmin API、Shutdown/Scaling 操作を整備。

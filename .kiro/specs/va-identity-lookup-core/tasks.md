@@ -38,14 +38,14 @@
   - _依存タスク: 1.x_
   - _完了条件: PartitionBridge 経由のモックテストで要求が往復すること_
 
-- [x] 2.2 PlacementActor のアクティベーション/ Terminated 処理を実装
+- [ ] 2.2 PlacementActor のアクティベーション/ Terminated 処理を実装
   - Props への ClusterIdentity 注入、ActivationResponse 成功/失敗時の Ledger 更新、BlockList 通知を実装
   - Terminated 受信で lease を Released に切り替え、ClusterEvent::ActivationTerminated を publish
   - _対応要件: 2.1, 2.2, 2.3_
   - _依存タスク: 2.1_
   - _完了条件: Placement 経路の単体テストと EventStream の検証が green_
 
-- [x] 2.3 Graceful Shutdown と lease リリースフローを実装
+- [ ] 2.3 Graceful Shutdown と lease リリースフローを実装
   - Runtime に shutdown API を追加し、LeaseStatus::Releasing/Released/TimedOut の遷移と Retry 拒否 (`ClusterError::ShuttingDown`) を実装
   - Shutdown シーケンスを統合テストし、未解放 lease が一定時間でタイムアウトすることを確認
   - _対応要件: 2.4, 2.5_
@@ -79,19 +79,19 @@
   - _依存タスク: 3.2_
   - _完了条件: 統合テスト suite が green で、CI 上で実行されること_
 
-- [x] 4. 観測性・メトリクスと最終統合
+- [ ] 4. 観測性・メトリクスと最終統合
   - _対応要件: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _依存タスク: 1-3_
   - _完了条件: 4.x 子タスク完了＋CI で EventStream/metrics テストが green_
 
-- [x] 4.1 ClusterEvent と EventStream 連携を実装
+- [ ] 4.1 ClusterEvent と EventStream 連携を実装
   - ActivationStarted/ActivationTerminated/BlockListApplied/RetryThrottled イベントを EventStreamEvent に追加し、各シナリオで publish
   - Std/NoStd サブスクライバがイベントを受信できるようアダプタを更新
   - _対応要件: 4.1, 4.2_
   - _依存タスク: 1-3_
   - _完了条件: EventStream の単体テストと subscriber mocks が green_
 
-- [x] 4.2 ClusterMetrics を計測
+- [ ] 4.2 ClusterMetrics を計測
   - resolve/request duration、retry count、virtual actor gauge、BlockList 件数などを OpenTelemetry で記録
   - Graceful Shutdown／BlockList シナリオでメトリクスが期待値になることを検証
   - _対応要件: 4.3, 4.4_
@@ -104,3 +104,35 @@
   - _対応要件: 全要件 (1.1-4.5)_
   - _依存タスク: 4.2_
   - _完了条件: 統合テストが CI で green、ベンチ結果がログに保存されること_
+
+---
+
+## リカバリ作業 (追加)
+- [ ] 5. ClusterExtension と ActorSystem への組み込み
+  - ClusterExtension/Installer を実装し、TopologyWatch・ClusterRuntime を system guardian 配下に登録
+  - _対応要件: 1.5, 設計：拡張経路_
+  - _完了条件: Extension 経由で ClusterContext を取得できる統合テストが green_
+
+- [x] 5.1 EventStream/ClusterEvent 配信の実装
+  - ClusterEventPublisher を EventStream adapter に接続し、Activation/Termination/BlockList/RetryThrottled を publish
+  - _対応要件: 4.1, 4.2_
+  - _完了条件: EventStream subscriber モックが各イベントを受信すること_
+
+- [x] 5.2 ClusterMetrics の std 実装
+  - OpenTelemetry ベースのメトリクスシンクを追加し、resolve/request/retry/blocklist/gauge を記録
+  - _対応要件: 4.3, 4.4_
+  - _完了条件: メトリクス E2E テストが green_
+
+- [x] 5.3 Graceful Shutdown / 所有者変更フロー強化
+  - LeaseStatus::Releasing/Released/TimedOut を PlacementActor 経由で反映し、所有者変更時に Poison と release を発火
+  - _対応要件: 2.3, 2.4, 2.5_
+  - _完了条件: Shutdown/owner-change シナリオの統合テスト green_
+
+- [x] 5.4 PidCache 無効化の拡張
+  - Topology hash 変更とノード離脱時に cache invalidate を行う経路を追加し、テストする
+  - _対応要件: 3.5_
+  - _完了条件: 離脱・再解決テストが green_
+
+- [ ] 5.5 CI 整合性
+  - `cargo fmt` / clippy 差分を解消し、ci-check.sh lint/clippy が通ることを確認
+  - _完了条件: ci-check.sh lint/clippy green_
