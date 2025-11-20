@@ -8,13 +8,14 @@ use fraktor_utils_rs::core::{runtime_toolbox::RuntimeToolbox, sync::ArcShared};
 
 use crate::core::{
   activation::{
-    ActivationLease, ActivationLedger, ActivationRequest, LeaseId, LedgerError, PartitionBridge, PartitionBridgeError,
+    ActivationLease, ActivationLedger, ActivationRequest, ActivationResponse, LeaseId, LedgerError, PartitionBridge,
+    PartitionBridgeError,
   },
   config::ClusterConfig,
   events::{ClusterEvent, ClusterEventPublisher},
   identity::{ClusterIdentity, IdentityLookupService, NodeId},
   metrics::ClusterMetrics,
-  routing::{ClusterError, PidCache},
+  routing::{ClusterError, PidCache, PidCacheEntry},
 };
 
 /// Resolution result helpers.
@@ -197,7 +198,52 @@ where
   ///
   /// Returns `PartitionBridgeError` if the request could not be dispatched.
   pub fn dispatch_activation_request(&self, request: ActivationRequest<TB>) -> Result<(), PartitionBridgeError> {
+    self.events.enqueue(ClusterEvent::ActivationStarted {
+      identity: request.identity().clone(),
+      owner:    request.lease().owner().clone(),
+    });
     self.bridge.send_activation_request(request)
+  }
+
+  /// Processes activation response from placement.
+  pub fn handle_activation_response(&self, response: ActivationResponse) -> Result<(), ClusterError> {
+    if let Some(error) = response.error() {
+      let released = self.activation.release(response.identity(), response.lease_id());
+      if !released {
+        return Err(ClusterError::OwnershipChanged);
+      }
+      self.pid_cache.invalidate(response.identity());
+      self.metrics.set_virtual_actor_gauge(self.activation.len());
+      self
+        .events
+        .enqueue(ClusterEvent::ActivationFailed { identity: response.identity().clone(), reason: error.clone() });
+      return Ok(());
+    }
+
+    let pid = response.pid().ok_or(ClusterError::RuntimeFailure)?;
+    let lease = self.activation.get(response.identity()).ok_or(ClusterError::OwnershipChanged)?;
+    if lease.lease_id() != response.lease_id() || lease.topology_hash() != response.topology_hash() {
+      return Err(ClusterError::OwnershipChanged);
+    }
+
+    self
+      .pid_cache
+      .insert(response.identity().clone(), PidCacheEntry::new(pid, lease.owner().clone(), lease.topology_hash()));
+    self.metrics.set_virtual_actor_gauge(self.activation.len());
+    Ok(())
+  }
+
+  /// Handles termination notification for a tracked lease.
+  pub fn handle_activation_terminated(
+    &self,
+    identity: &ClusterIdentity,
+    lease_id: LeaseId,
+  ) -> Result<(), ClusterError> {
+    let lease = self.activation.complete_release(identity, lease_id).ok_or(ClusterError::OwnershipChanged)?;
+    self.pid_cache.invalidate(identity);
+    self.metrics.set_virtual_actor_gauge(self.activation.len());
+    self.events.enqueue(ClusterEvent::ActivationTerminated { identity: identity.clone(), lease });
+    Ok(())
   }
 
   /// Returns the partition bridge handle.

@@ -1,5 +1,5 @@
 use crate::core::{
-  activation::ActivationLease,
+  activation::{ActivationError, ActivationLease},
   identity::{ClusterIdentity, NodeId},
 };
 
@@ -12,6 +12,13 @@ pub enum ClusterEvent {
     identity: ClusterIdentity,
     /// Owning node executing the activation.
     owner:    NodeId,
+  },
+  /// Activation failed during placement.
+  ActivationFailed {
+    /// Identity whose activation failed.
+    identity: ClusterIdentity,
+    /// Reason provided by placement.
+    reason:   ActivationError,
   },
   /// Activation terminated and lease released.
   ActivationTerminated {

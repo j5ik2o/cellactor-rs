@@ -62,6 +62,9 @@ where
       | ClusterEvent::RetryThrottled { identity } => {
         (LogLevel::Warn, format!("cluster.retry_throttled identity={}", fmt_identity(identity)))
       },
+      | ClusterEvent::ActivationFailed { identity, reason } => {
+        (LogLevel::Error, format!("cluster.activation_failed identity={} reason={:?}", fmt_identity(identity), reason))
+      },
     };
 
     let log = LogEvent::new(level, message, Duration::ZERO, None);

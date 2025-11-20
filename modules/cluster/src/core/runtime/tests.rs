@@ -12,8 +12,8 @@ use fraktor_utils_rs::core::{runtime_toolbox::NoStdToolbox, sync::ArcShared};
 
 use crate::core::{
   activation::{
-    ActivationLease, ActivationLedger, ActivationRequest, ActivationResponse, LeaseId, LeaseStatus, PartitionBridge,
-    PartitionBridgeError,
+    ActivationError, ActivationLease, ActivationLedger, ActivationRequest, ActivationResponse, LeaseId, LeaseStatus,
+    PartitionBridge, PartitionBridgeError,
   },
   config::{
     ClusterConfig, ClusterMetricsConfig, HashStrategy, RetryPolicy, TopologyWatch, topology_stream::TopologyStream,
@@ -294,7 +294,8 @@ fn dispatches_activation_request_via_bridge() {
   let bridge = ArcShared::new(TestBridge::default());
   let pid_cache = ArcShared::new(PidCache::new());
   let events = ArcShared::new(ClusterEventPublisher::new());
-  let runtime = ClusterRuntime::new(config, identity_service, ledger, metrics, bridge.clone(), pid_cache, events);
+  let runtime =
+    ClusterRuntime::new(config, identity_service, ledger, metrics, bridge.clone(), pid_cache, events.clone());
 
   let identity = ClusterIdentity::new("echo", "req");
   let lease = ActivationLease::new(LeaseId::new(1), NodeId::new("node-a"), 2, LeaseStatus::Active);
@@ -306,6 +307,95 @@ fn dispatches_activation_request_via_bridge() {
   let recorded = bridge.requests.lock().unwrap();
   assert_eq!(recorded.len(), 1);
   assert_eq!(recorded[0], identity);
+
+  let drained = events.drain();
+  assert!(drained.iter().any(|event| matches!(event,
+    ClusterEvent::ActivationStarted { identity: ev_id, owner }
+    if ev_id == &ClusterIdentity::new("echo", "req") && owner == &NodeId::new("node-a")
+  )));
+}
+
+#[test]
+fn activation_failure_releases_lease_and_emits_event() {
+  let identity_service = ArcShared::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
+  identity_service.update_topology(&sample_snapshot());
+  let ledger = ArcShared::new(ActivationLedger::<NoStdToolbox>::new());
+  let metrics_impl = ArcShared::new(TestMetrics::default());
+  let metrics: ArcShared<dyn ClusterMetrics> = metrics_impl.clone();
+  let bridge = ArcShared::new(TestBridge::default());
+  let pid_cache = ArcShared::new(PidCache::new());
+  let events = ArcShared::new(ClusterEventPublisher::new());
+  let runtime = ClusterRuntime::new(
+    sample_config(),
+    identity_service.clone(),
+    ledger.clone(),
+    metrics,
+    bridge,
+    pid_cache,
+    events.clone(),
+  );
+
+  let identity = ClusterIdentity::new("echo", "fail");
+  let requester = NodeId::new("req");
+  let resolution = runtime.resolve_owner(&identity, &requester).expect("acquire lease");
+
+  let response = ActivationResponse::failure(
+    identity.clone(),
+    ActivationError::SpawnFailed,
+    resolution.lease().lease_id(),
+    resolution.lease().topology_hash(),
+  );
+
+  runtime.handle_activation_response(response).expect("handle failure");
+
+  assert!(ledger.get(&identity).is_none());
+  assert!(runtime.pid_cache().get(&identity).is_none());
+  let drained = events.drain();
+  assert!(
+    drained
+      .iter()
+      .any(|event| matches!(event, ClusterEvent::ActivationFailed { identity: ev_id, .. } if ev_id == &identity))
+  );
+}
+
+#[test]
+fn activation_terminated_clears_cache_and_emits_event() {
+  let identity_service = ArcShared::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
+  identity_service.update_topology(&sample_snapshot());
+  let ledger = ArcShared::new(ActivationLedger::<NoStdToolbox>::new());
+  let metrics_impl = ArcShared::new(TestMetrics::default());
+  let metrics: ArcShared<dyn ClusterMetrics> = metrics_impl.clone();
+  let bridge = ArcShared::new(TestBridge::default());
+  let pid_cache = ArcShared::new(PidCache::new());
+  let events = ArcShared::new(ClusterEventPublisher::new());
+  let runtime = ClusterRuntime::new(
+    sample_config(),
+    identity_service.clone(),
+    ledger.clone(),
+    metrics,
+    bridge,
+    pid_cache.clone(),
+    events.clone(),
+  );
+
+  let identity = ClusterIdentity::new("echo", "term");
+  let requester = NodeId::new("req");
+  let resolution = runtime.resolve_owner(&identity, &requester).expect("acquire lease");
+  pid_cache.insert(
+    identity.clone(),
+    PidCacheEntry::new(Pid::new(99, 0), resolution.owner().id().clone(), resolution.lease().topology_hash()),
+  );
+
+  runtime.handle_activation_terminated(&identity, resolution.lease().lease_id()).expect("handle terminated");
+
+  assert!(ledger.get(&identity).is_none());
+  assert!(pid_cache.get(&identity).is_none());
+  let drained = events.drain();
+  assert!(
+    drained
+      .iter()
+      .any(|event| matches!(event, ClusterEvent::ActivationTerminated { identity: ev_id, .. } if ev_id == &identity))
+  );
 }
 
 fn sample_snapshot() -> TopologySnapshot {
