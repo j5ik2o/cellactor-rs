@@ -1,9 +1,11 @@
 use alloc::sync::Arc;
+use core::time::Duration;
 
 use fraktor_utils_rs::core::runtime_toolbox::RuntimeToolbox;
 
 use crate::core::config::RetryPolicy;
 use crate::core::identity::{ClusterIdentity, NodeId};
+use crate::core::metrics::ClusterMetrics;
 
 use super::cluster_error::ClusterError;
 use super::pid_cache::{PidCache, PidCacheEntry};
@@ -26,6 +28,7 @@ where
     runtime: Arc<dyn ResolveBridge<TB>>,
     cache: Arc<PidCache<TB>>,
     policy: RetryPolicy,
+    metrics: Arc<dyn ClusterMetrics>,
 }
 
 impl<TB> ClusterContext<TB>
@@ -34,13 +37,19 @@ where
 {
     /// Creates a new cluster context.
     #[must_use]
-    pub fn new(runtime: Arc<dyn ResolveBridge<TB>>, cache: Arc<PidCache<TB>>, policy: RetryPolicy) -> Self {
-        Self { runtime, cache, policy }
+    pub fn new(
+        runtime: Arc<dyn ResolveBridge<TB>>,
+        cache: Arc<PidCache<TB>>,
+        policy: RetryPolicy,
+        metrics: Arc<dyn ClusterMetrics>,
+    ) -> Self {
+        Self { runtime, cache, policy, metrics }
     }
 
     /// Resolves a PID, consulting the cache first and applying retries when needed.
     pub fn request(&self, identity: &ClusterIdentity, requester: &NodeId) -> Result<PidCacheEntry, ClusterError> {
         if let Some(entry) = self.cache.get(identity) {
+            self.metrics.record_resolve_duration(identity, Duration::ZERO);
             return Ok(entry);
         }
 
@@ -49,11 +58,13 @@ where
             match self.runtime.resolve(identity, requester) {
                 Ok(entry) => {
                     self.cache.insert(identity.clone(), entry.clone());
+                     self.metrics.record_resolve_duration(identity, Duration::ZERO);
                     return Ok(entry);
                 }
                 Err(err) => match runner.next() {
                     RetryOutcome::RetryAfter(_) => {
                         self.cache.invalidate(identity);
+                        self.metrics.record_retry(identity);
                         continue;
                     }
                     RetryOutcome::GiveUp => return Err(err),

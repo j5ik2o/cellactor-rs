@@ -91,7 +91,7 @@
   - _依存タスク: 1-3_
   - _完了条件: EventStream の単体テストと subscriber mocks が green_
 
-- [ ] 4.2 ClusterMetrics を計測
+- [x] 4.2 ClusterMetrics を計測
   - resolve/request duration、retry count、virtual actor gauge、BlockList 件数などを OpenTelemetry で記録
   - Graceful Shutdown／BlockList シナリオでメトリクスが期待値になることを検証
   - _対応要件: 4.3, 4.4_

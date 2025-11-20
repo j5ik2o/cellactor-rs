@@ -101,6 +101,11 @@ where
         let mut guard = self.state.lock();
         guard.entries.drain().collect()
     }
+
+    /// Returns the number of tracked leases.
+    pub fn len(&self) -> usize {
+        self.state.lock().entries.len()
+    }
 }
 
 impl Default for LedgerState {

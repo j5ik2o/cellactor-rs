@@ -1,5 +1,6 @@
 use alloc::{sync::Arc, vec::Vec};
 use core::sync::atomic::{AtomicBool, Ordering};
+use core::time::Duration;
 
 use fraktor_utils_rs::core::runtime_toolbox::RuntimeToolbox;
 
@@ -98,22 +99,31 @@ where
             .activation
             .acquire(identity.clone(), owner.id().clone(), topology_hash)
         {
-            Ok(lease) => Ok(OwnerResolution::new(owner, lease)),
+            Ok(lease) => {
+                self.metrics.record_resolve_duration(identity, Duration::ZERO);
+                self.metrics.set_virtual_actor_gauge(self.activation.len());
+                Ok(OwnerResolution::new(owner, lease))
+            }
             Err(LedgerError::AlreadyOwned { existing }) => Err(ResolveError::LeaseConflict { existing }),
         }
     }
 
     /// Handles block list notification for the provided node.
     pub fn handle_blocked_node(&self, node: &NodeId) -> Vec<(ClusterIdentity, ActivationLease)> {
+        self.metrics.increment_block_list(node);
         self.pid_cache.invalidate_node(node);
-        self.activation.revoke_owner(node)
+        let revoked = self.activation.revoke_owner(node);
+        self.metrics.set_virtual_actor_gauge(self.activation.len());
+        revoked
     }
 
     /// Begins graceful shutdown by rejecting future resolves and releasing leases.
     pub fn begin_shutdown(&self) -> Vec<(ClusterIdentity, ActivationLease)> {
         self.shutting_down.store(true, Ordering::SeqCst);
         self.pid_cache.clear();
-        self.activation.release_all()
+        let released = self.activation.release_all();
+        self.metrics.set_virtual_actor_gauge(0);
+        released
     }
 
     /// Dispatches the activation request through the partition bridge.

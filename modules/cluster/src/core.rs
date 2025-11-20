@@ -14,3 +14,5 @@ pub mod metrics;
 pub mod routing;
 /// Placement coordination and activation drivers.
 pub mod placement;
+/// Cluster events and EventStream wiring.
+pub mod events;

@@ -30,11 +30,47 @@ impl TopologyStream for DummyStream {
     }
 }
 
-struct TestMetrics;
+#[derive(Default)]
+struct TestMetrics {
+    resolves: Mutex<u32>,
+    retries: Mutex<u32>,
+    block_lists: Mutex<u32>,
+    gauge: Mutex<usize>,
+}
+
+impl TestMetrics {
+    fn gauge(&self) -> usize {
+        *self.gauge.lock().unwrap()
+    }
+
+    fn block_list_count(&self) -> u32 {
+        *self.block_lists.lock().unwrap()
+    }
+
+    fn resolve_count(&self) -> u32 {
+        *self.resolves.lock().unwrap()
+    }
+}
 
 impl ClusterMetrics for TestMetrics {
     fn as_any(&self) -> &dyn core::any::Any {
         self
+    }
+
+    fn record_resolve_duration(&self, _identity: &ClusterIdentity, _duration: core::time::Duration) {
+        *self.resolves.lock().unwrap() += 1;
+    }
+
+    fn record_retry(&self, _identity: &ClusterIdentity) {
+        *self.retries.lock().unwrap() += 1;
+    }
+
+    fn set_virtual_actor_gauge(&self, value: usize) {
+        *self.gauge.lock().unwrap() = value;
+    }
+
+    fn increment_block_list(&self, _node: &NodeId) {
+        *self.block_lists.lock().unwrap() += 1;
     }
 }
 
@@ -58,7 +94,8 @@ fn runtime_retains_dependencies() {
     let config = sample_config();
     let identity = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 7));
     let activation = Arc::new(ActivationLedger::<NoStdToolbox>::new());
-    let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
+    let metrics_impl = Arc::new(TestMetrics::default());
+    let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
 
     let bridge = Arc::new(TestBridge::default());
     let pid_cache = Arc::new(PidCache::new());
@@ -89,7 +126,8 @@ fn resolve_owner_acquires_lease() {
     let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
     identity_service.update_topology(sample_snapshot());
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
-    let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
+    let metrics_impl = Arc::new(TestMetrics::default());
+    let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
 
     let bridge = Arc::new(TestBridge::default());
     let pid_cache = Arc::new(PidCache::new());
@@ -99,6 +137,8 @@ fn resolve_owner_acquires_lease() {
         .resolve_owner(&identity, &requester)
         .expect("first resolve");
     assert_eq!(first.owner().id().as_str(), "node-b");
+    assert_eq!(metrics_impl.resolve_count(), 1);
+    assert_eq!(metrics_impl.gauge(), 1);
 
     let err = runtime
         .resolve_owner(&identity, &requester)
@@ -117,7 +157,8 @@ fn handle_blocked_node_revokes_leases() {
     let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
     identity_service.update_topology(sample_snapshot());
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
-    let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
+    let metrics_impl = Arc::new(TestMetrics::default());
+    let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
     let bridge = Arc::new(TestBridge::default());
     let pid_cache = Arc::new(PidCache::new());
     let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge, pid_cache.clone());
@@ -139,6 +180,8 @@ fn handle_blocked_node_revokes_leases() {
     assert_eq!(revoked[0].0, identity);
     assert!(matches!(revoked[0].1.status(), LeaseStatus::Revoked));
     assert!(ledger.get(&identity).is_none());
+    assert_eq!(metrics_impl.block_list_count(), 1);
+    assert_eq!(metrics_impl.gauge(), 0);
     assert!(pid_cache.get(&identity).is_none());
 }
 
@@ -148,7 +191,8 @@ fn begin_shutdown_prevents_new_resolves() {
     let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
     identity_service.update_topology(sample_snapshot());
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
-    let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
+    let metrics_impl = Arc::new(TestMetrics::default());
+    let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
     let bridge = Arc::new(TestBridge::default());
     let pid_cache = Arc::new(PidCache::new());
     let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge, pid_cache.clone());
@@ -167,6 +211,7 @@ fn begin_shutdown_prevents_new_resolves() {
         .expect_err("shutdown should block resolves");
     assert!(matches!(err, ResolveError::ShuttingDown));
     assert!(ledger.release_all().is_empty());
+    assert_eq!(metrics_impl.gauge(), 0);
     assert!(pid_cache.get(&identity).is_none());
 }
 
@@ -176,7 +221,8 @@ fn dispatches_activation_request_via_bridge() {
     let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
     identity_service.update_topology(sample_snapshot());
     let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
-    let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
+    let metrics_impl = Arc::new(TestMetrics::default());
+    let metrics: Arc<dyn ClusterMetrics> = metrics_impl.clone();
     let bridge = Arc::new(TestBridge::default());
     let pid_cache = Arc::new(PidCache::new());
     let runtime = ClusterRuntime::new(config, identity_service, ledger, metrics, bridge.clone(), pid_cache);
