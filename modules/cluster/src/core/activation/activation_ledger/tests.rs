@@ -38,3 +38,26 @@ fn rejects_duplicate_acquire() {
         }
     }
 }
+
+#[test]
+fn revoke_by_owner_removes_matching_leases() {
+    let ledger = ActivationLedger::<NoStdToolbox>::new();
+    let identity_a = ClusterIdentity::new("echo", "a");
+    let identity_b = ClusterIdentity::new("echo", "b");
+
+    let lease_a = ledger
+        .acquire(identity_a.clone(), NodeId::new("node-a"), 5)
+        .expect("lease a");
+    let _ = ledger
+        .acquire(identity_b.clone(), NodeId::new("node-b"), 5)
+        .expect("lease b");
+
+    let revoked = ledger.revoke_owner(&NodeId::new("node-a"));
+
+    assert_eq!(revoked.len(), 1);
+    assert_eq!(revoked[0].0, identity_a);
+    assert_eq!(revoked[0].1.lease_id(), lease_a.lease_id());
+    assert!(matches!(revoked[0].1.status(), LeaseStatus::Revoked));
+    assert!(ledger.get(&identity_a).is_none());
+    assert!(ledger.get(&identity_b).is_some());
+}

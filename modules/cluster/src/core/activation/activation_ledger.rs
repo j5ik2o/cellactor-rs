@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use hashbrown::HashMap;
 use rapidhash::RapidBuildHasher;
 
@@ -75,6 +77,23 @@ where
     pub fn get(&self, identity: &ClusterIdentity) -> Option<ActivationLease> {
         let guard = self.state.lock();
         guard.entries.get(identity).cloned()
+    }
+
+    /// Revokes all leases owned by the provided node.
+    pub fn revoke_owner(&self, owner: &NodeId) -> Vec<(ClusterIdentity, ActivationLease)> {
+        let mut guard = self.state.lock();
+        let mut revoked = Vec::new();
+        guard.entries.retain(|identity, lease| {
+            if lease.owner() == owner {
+                let mut revoked_lease = lease.clone();
+                revoked_lease.set_status(LeaseStatus::Revoked);
+                revoked.push((identity.clone(), revoked_lease));
+                false
+            } else {
+                true
+            }
+        });
+        revoked
     }
 }
 

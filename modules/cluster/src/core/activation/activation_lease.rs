@@ -40,4 +40,7 @@ impl ActivationLease {
         self.status
     }
 
+    pub(crate) fn set_status(&mut self, status: LeaseStatus) {
+        self.status = status;
+    }
 }

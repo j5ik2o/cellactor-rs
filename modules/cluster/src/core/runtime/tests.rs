@@ -6,7 +6,7 @@ use core::ptr;
 
 use fraktor_utils_rs::core::runtime_toolbox::NoStdToolbox;
 
-use crate::core::activation::ActivationLedger;
+use crate::core::activation::{ActivationLedger, LeaseStatus};
 use crate::core::config::{
     ClusterConfig, ClusterMetricsConfig, HashStrategy, RetryPolicy, TopologyStream, TopologyWatch,
 };
@@ -101,4 +101,28 @@ fn resolve_owner_acquires_lease() {
         }
         _ => panic!("unexpected error"),
     }
+}
+
+#[test]
+fn handle_blocked_node_revokes_leases() {
+    let config = sample_config();
+    let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
+    identity_service.update_topology(sample_snapshot());
+    let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
+    let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
+    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics);
+
+    let identity = ClusterIdentity::new("echo", "id-1");
+    let requester = NodeId::new("req");
+    let resolution = runtime
+        .resolve_owner(&identity, &requester)
+        .expect("resolution");
+    let owner_id = resolution.owner().id().clone();
+
+    let revoked = runtime.handle_blocked_node(&owner_id);
+
+    assert_eq!(revoked.len(), 1);
+    assert_eq!(revoked[0].0, identity);
+    assert!(matches!(revoked[0].1.status(), LeaseStatus::Revoked));
+    assert!(ledger.get(&identity).is_none());
 }

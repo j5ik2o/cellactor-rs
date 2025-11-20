@@ -19,7 +19,7 @@
   - _依存タスク: 1.1_
   - _完了条件: hash_rings PoC が nightly でビルド成功し、lease の状態遷移テストがグリーン_
 
-- [ ] 1.3 BlockList 連動と PidCache 無効化経路を組み込む
+- [x] 1.3 BlockList 連動と PidCache 無効化経路を組み込む
   - ClusterBlocklistHook を実装して RemoteAuthorityManager のイベントから lease を即時 Revoked に更新
   - BlockListApplied イベント発行と PidCache invalidation をシーケンス通りに接続し、二重経路（hook＋EventStream）を保証
   - _対応要件: 1.4, 4.1_
