@@ -11,6 +11,7 @@ use crate::core::{
     ActivationLease, ActivationLedger, ActivationRequest, LeaseId, LedgerError, PartitionBridge, PartitionBridgeError,
   },
   config::ClusterConfig,
+  events::{ClusterEvent, ClusterEventPublisher},
   identity::{ClusterIdentity, IdentityLookupService, NodeId},
   metrics::ClusterMetrics,
   routing::{ClusterError, PidCache},
@@ -37,6 +38,7 @@ where
   metrics:       ArcShared<dyn ClusterMetrics>,
   bridge:        ArcShared<dyn PartitionBridge<TB>>,
   pid_cache:     ArcShared<PidCache<TB>>,
+  events:        ArcShared<ClusterEventPublisher<TB>>,
   shutting_down: AtomicBool,
 }
 
@@ -53,8 +55,9 @@ where
     metrics: ArcShared<dyn ClusterMetrics>,
     bridge: ArcShared<dyn PartitionBridge<TB>>,
     pid_cache: ArcShared<PidCache<TB>>,
+    events: ArcShared<ClusterEventPublisher<TB>>,
   ) -> Self {
-    Self { config, identity, activation, metrics, bridge, pid_cache, shutting_down: AtomicBool::new(false) }
+    Self { config, identity, activation, metrics, bridge, pid_cache, events, shutting_down: AtomicBool::new(false) }
   }
 
   /// Returns the runtime configuration.
@@ -80,6 +83,11 @@ where
   /// Returns the PID cache handle.
   pub fn pid_cache(&self) -> &PidCache<TB> {
     &self.pid_cache
+  }
+
+  /// Returns the event publisher.
+  pub fn events(&self) -> &ClusterEventPublisher<TB> {
+    &self.events
   }
 
   /// Resolves the owner for the provided cluster identity.
@@ -109,6 +117,7 @@ where
     self.pid_cache.invalidate_node(node);
     let revoked = self.activation.revoke_owner(node);
     self.metrics.set_virtual_actor_gauge(self.activation.len());
+    self.events.enqueue(ClusterEvent::BlockListApplied { node: node.clone() });
     revoked
   }
 
@@ -127,6 +136,12 @@ where
       }
     }
     removed
+  }
+
+  /// Called when topology streaming stops; keeps last snapshot and logs warning.
+  pub fn handle_topology_stream_stopped(&self) {
+    // No-op placeholder: actual logging is performed in std layer.
+    // The runtime intentionally keeps current snapshot and waits for refresh.
   }
 
   /// Begins graceful shutdown by rejecting future resolves and releasing leases.

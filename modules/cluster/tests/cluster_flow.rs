@@ -12,6 +12,7 @@ use fraktor_cluster_rs::core::{
   config::{
     ClusterConfig, ClusterMetricsConfig, HashStrategy, RetryPolicy, TopologyWatch, topology_stream::TopologyStream,
   },
+  events::ClusterEventPublisher,
   identity::{ClusterIdentity, ClusterNode, IdentityLookupService, NodeId, TopologySnapshot},
   metrics::ClusterMetrics,
   routing::{PidCache, PidCacheEntry},
@@ -37,9 +38,17 @@ fn activation_request_shutdown_flow() {
   let metrics: ArcShared<dyn ClusterMetrics> = metrics_impl.clone();
   let bridge = ArcShared::new(MockBridge::default());
   let pid_cache = ArcShared::new(PidCache::new());
+  let events = ArcShared::new(ClusterEventPublisher::new());
 
-  let runtime =
-    ClusterRuntime::new(config, identity_service.clone(), ledger.clone(), metrics, bridge.clone(), pid_cache.clone());
+  let runtime = ClusterRuntime::new(
+    config,
+    identity_service.clone(),
+    ledger.clone(),
+    metrics,
+    bridge.clone(),
+    pid_cache.clone(),
+    events,
+  );
 
   let identity = ClusterIdentity::new("echo", "integration");
   let requester = NodeId::new("req");

@@ -16,6 +16,8 @@ mod retry_jitter;
 mod retry_policy;
 /// Trait representing topology streams supplied by providers.
 pub mod topology_stream;
+/// Handle to detect topology stream termination.
+mod topology_stream_handle;
 /// Handle that owns a topology stream.
 mod topology_watch;
 
@@ -26,4 +28,5 @@ pub use cluster_metrics_config::ClusterMetricsConfig;
 pub use hash_strategy::HashStrategy;
 pub use retry_jitter::RetryJitter;
 pub use retry_policy::RetryPolicy;
+pub use topology_stream_handle::TopologyStreamHandle;
 pub use topology_watch::TopologyWatch;
