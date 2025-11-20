@@ -61,3 +61,23 @@ fn revoke_by_owner_removes_matching_leases() {
     assert!(ledger.get(&identity_a).is_none());
     assert!(ledger.get(&identity_b).is_some());
 }
+
+#[test]
+fn release_all_drains_entries() {
+    let ledger = ActivationLedger::<NoStdToolbox>::new();
+    let identity_a = ClusterIdentity::new("echo", "a");
+    let identity_b = ClusterIdentity::new("echo", "b");
+
+    let _ = ledger
+        .acquire(identity_a.clone(), NodeId::new("node-a"), 5)
+        .expect("lease a");
+    let _ = ledger
+        .acquire(identity_b.clone(), NodeId::new("node-b"), 5)
+        .expect("lease b");
+
+    let released = ledger.release_all();
+
+    assert_eq!(released.len(), 2);
+    assert!(ledger.get(&identity_a).is_none());
+    assert!(ledger.get(&identity_b).is_none());
+}

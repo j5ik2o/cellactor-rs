@@ -127,6 +127,28 @@ fn handle_blocked_node_revokes_leases() {
 }
 
 #[test]
+fn begin_shutdown_prevents_new_resolves() {
+    let config = sample_config();
+    let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));
+    identity_service.update_topology(sample_snapshot());
+    let ledger = Arc::new(ActivationLedger::<NoStdToolbox>::new());
+    let metrics: Arc<dyn ClusterMetrics> = Arc::new(TestMetrics);
+    let bridge = Arc::new(TestBridge::default());
+    let runtime = ClusterRuntime::new(config, identity_service, ledger.clone(), metrics, bridge);
+
+    let identity = ClusterIdentity::new("echo", "a");
+    let requester = NodeId::new("req");
+
+    runtime.begin_shutdown();
+
+    let err = runtime
+        .resolve_owner(&identity, &requester)
+        .expect_err("shutdown should block resolves");
+    assert!(matches!(err, ResolveError::ShuttingDown));
+    assert!(ledger.release_all().is_empty());
+}
+
+#[test]
 fn dispatches_activation_request_via_bridge() {
     let config = sample_config();
     let identity_service = Arc::new(IdentityLookupService::<NoStdToolbox>::new(HashStrategy::Rendezvous, 17));

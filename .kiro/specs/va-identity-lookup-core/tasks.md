@@ -38,14 +38,14 @@
   - _依存タスク: 1.x_
   - _完了条件: PartitionBridge 経由のモックテストで要求が往復すること_
 
-- [ ] 2.2 PlacementActor のアクティベーション/ Terminated 処理を実装
+- [x] 2.2 PlacementActor のアクティベーション/ Terminated 処理を実装
   - Props への ClusterIdentity 注入、ActivationResponse 成功/失敗時の Ledger 更新、BlockList 通知を実装
   - Terminated 受信で lease を Released に切り替え、ClusterEvent::ActivationTerminated を publish
   - _対応要件: 2.1, 2.2, 2.3_
   - _依存タスク: 2.1_
   - _完了条件: Placement 経路の単体テストと EventStream の検証が green_
 
-- [ ] 2.3 Graceful Shutdown と lease リリースフローを実装
+- [x] 2.3 Graceful Shutdown と lease リリースフローを実装
   - Runtime に shutdown API を追加し、LeaseStatus::Releasing/Released/TimedOut の遷移と Retry 拒否 (`ClusterError::ShuttingDown`) を実装
   - Shutdown シーケンスを統合テストし、未解放 lease が一定時間でタイムアウトすることを確認
   - _対応要件: 2.4, 2.5_

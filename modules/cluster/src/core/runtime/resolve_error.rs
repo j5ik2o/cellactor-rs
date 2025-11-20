@@ -14,4 +14,7 @@ pub enum ResolveError {
         /// Existing lease that currently guards the identity.
         existing: ActivationLease,
     },
+    /// Runtime is shutting down and no new activations are accepted.
+    #[error("cluster runtime is shutting down")]
+    ShuttingDown,
 }

@@ -1,4 +1,5 @@
 use alloc::{sync::Arc, vec::Vec};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use fraktor_utils_rs::core::runtime_toolbox::RuntimeToolbox;
 
@@ -25,6 +26,7 @@ where
     activation: Arc<ActivationLedger<TB>>,
     metrics: Arc<dyn ClusterMetrics>,
     bridge: Arc<dyn PartitionBridge<TB>>,
+    shutting_down: AtomicBool,
 }
 
 impl<TB> ClusterRuntime<TB>
@@ -45,6 +47,7 @@ where
             activation,
             metrics,
             bridge,
+            shutting_down: AtomicBool::new(false),
         }
     }
 
@@ -74,6 +77,9 @@ where
         identity: &ClusterIdentity,
         requester: &NodeId,
     ) -> Result<OwnerResolution, ResolveError> {
+        if self.shutting_down.load(Ordering::SeqCst) {
+            return Err(ResolveError::ShuttingDown);
+        }
         let owner = self
             .identity
             .select_owner(identity, requester)
@@ -91,6 +97,12 @@ where
     /// Handles block list notification for the provided node.
     pub fn handle_blocked_node(&self, node: &NodeId) -> Vec<(ClusterIdentity, ActivationLease)> {
         self.activation.revoke_owner(node)
+    }
+
+    /// Begins graceful shutdown by rejecting future resolves and releasing leases.
+    pub fn begin_shutdown(&self) -> Vec<(ClusterIdentity, ActivationLease)> {
+        self.shutting_down.store(true, Ordering::SeqCst);
+        self.activation.release_all()
     }
 
     /// Dispatches the activation request through the partition bridge.

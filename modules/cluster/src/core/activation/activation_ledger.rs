@@ -95,6 +95,12 @@ where
         });
         revoked
     }
+
+    /// Releases all tracked leases, returning their identities and leases.
+    pub fn release_all(&self) -> Vec<(ClusterIdentity, ActivationLease)> {
+        let mut guard = self.state.lock();
+        guard.entries.drain().collect()
+    }
 }
 
 impl Default for LedgerState {
