@@ -84,7 +84,7 @@
   - _依存タスク: 1-3_
   - _完了条件: 4.x 子タスク完了＋CI で EventStream/metrics テストが green_
 
-- [ ] 4.1 ClusterEvent と EventStream 連携を実装
+- [x] 4.1 ClusterEvent と EventStream 連携を実装
   - ActivationStarted/ActivationTerminated/BlockListApplied/RetryThrottled イベントを EventStreamEvent に追加し、各シナリオで publish
   - Std/NoStd サブスクライバがイベントを受信できるようアダプタを更新
   - _対応要件: 4.1, 4.2_
