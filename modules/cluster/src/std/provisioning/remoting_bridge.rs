@@ -7,13 +7,17 @@ use alloc::string::String;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use crate::std::provisioning::provider_event::RemoteTopologyEvent;
-use crate::std::provisioning::remoting_port::RemotingPort;
+use crate::std::provisioning::{
+  provider_event::RemoteTopologyEvent,
+  remoting_health::RemotingHealthMetrics,
+  remoting_port::RemotingPort,
+};
 
 /// Remoting への送信をラップし冪等性を保証する。
 pub struct RemotingBridge {
   port: Arc<dyn RemotingPort>,
   seen: Mutex<HashSet<(String, u64)>>,
+  health: Option<Arc<RemotingHealthMetrics>>,
 }
 
 /// RemotingBridge 操作エラー。
@@ -32,7 +36,12 @@ pub enum RemotingBridgeError {
 impl RemotingBridge {
   /// 新しいブリッジを作成。
   pub fn new(port: Arc<dyn RemotingPort>) -> Self {
-    Self { port, seen: Mutex::new(HashSet::new()) }
+    Self { port, seen: Mutex::new(HashSet::new()), health: None }
+  }
+
+  /// 健全性メトリクス付きで作成。
+  pub fn with_health(port: Arc<dyn RemotingPort>, health: Arc<RemotingHealthMetrics>) -> Self {
+    Self { port, seen: Mutex::new(HashSet::new()), health: Some(health) }
   }
 
   /// 冪等キーに基づき配信し、重複は拒否する。
@@ -45,6 +54,9 @@ impl RemotingBridge {
       }
     }
     self.port.publish_remote_topology(event);
+    if let Some(health) = &self.health {
+      health.record_event(event);
+    }
     Ok(())
   }
 }

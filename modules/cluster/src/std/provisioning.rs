@@ -13,6 +13,7 @@ pub mod placement_supervisor_bridge;
 pub mod partition_manager_bridge;
 pub mod remoting_port;
 pub mod remoting_bridge;
+pub mod remoting_health;
 pub mod block_reflector;
 pub mod provisioning_metrics;
 pub mod provisioning_error;

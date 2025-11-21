@@ -2,9 +2,12 @@ use std::sync::{Arc, Mutex};
 
 use crate::core::identity::NodeId;
 use crate::core::provisioning::descriptor::ProviderId;
-use crate::std::provisioning::provider_event::{RemoteTopologyEvent, RemoteTopologyKind};
-use crate::std::provisioning::remoting_bridge::{RemotingBridge, RemotingBridgeError};
-use crate::std::provisioning::remoting_port::RemotingPort;
+use crate::std::provisioning::{
+  provider_event::{RemoteTopologyEvent, RemoteTopologyKind},
+  remoting_bridge::{RemotingBridge, RemotingBridgeError},
+  remoting_health::{RemotingHealthMetrics, RemotingNodeStatus},
+  remoting_port::RemotingPort,
+};
 
 struct RecordingPort {
   events: Mutex<Vec<(String, u64)>>,
@@ -56,4 +59,16 @@ fn allows_distinct_seq_for_same_provider() {
   bridge.publish(&event(2)).unwrap();
 
   assert_eq!(vec![("p1".to_string(), 1), ("p1".to_string(), 2)], *port.events.lock().unwrap());
+}
+
+#[test]
+fn updates_health_metrics_on_publish() {
+  let port = Arc::new(RecordingPort::new());
+  let health = Arc::new(RemotingHealthMetrics::new());
+  let bridge = RemotingBridge::with_health(port.clone(), health.clone());
+
+  bridge.publish(&event(1)).unwrap();
+
+  let entry = health.status_of("n1").unwrap();
+  assert_eq!(RemotingNodeStatus::Up, entry.status);
 }
