@@ -7,6 +7,7 @@ pub mod provider_event;
 pub mod provider_watch_hub;
 pub mod provider_stream;
 pub mod provider_stream_driver;
+pub mod provider_stream_runner;
 pub mod failover_controller;
 pub mod placement_supervisor_bridge;
 pub mod partition_manager_bridge;

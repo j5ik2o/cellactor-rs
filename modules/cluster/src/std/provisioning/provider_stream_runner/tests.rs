@@ -2,13 +2,14 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::core::identity::{ClusterNode, NodeId};
-use crate::core::provisioning::descriptor::ProviderId;
+use crate::core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind};
 use crate::core::provisioning::snapshot::{ProviderHealth, ProviderSnapshot};
+use crate::std::provisioning::failover_controller::{FailoverConfig, FailoverController};
 use crate::std::provisioning::partition_manager_bridge::{PartitionManagerBridge, PartitionManagerPort};
 use crate::std::provisioning::placement_supervisor_bridge::{PlacementSupervisorBridge, PlacementSupervisorPort};
 use crate::std::provisioning::provider_event::{ProviderEvent, ProviderTermination};
 use crate::std::provisioning::provider_stream::ProviderStream;
-use crate::std::provisioning::provider_stream_driver::{ProviderStreamDriver, StreamProgress};
+use crate::std::provisioning::provider_stream_runner::{ProviderStreamRunner, RunnerProgress};
 use crate::std::provisioning::provider_watch_hub::ProviderWatchHub;
 use crate::std::provisioning::provisioning_metrics::ProvisioningMetrics;
 
@@ -75,13 +76,23 @@ impl PartitionManagerPort for RecordingPartition {
   }
 }
 
+fn desc(id: &str, prio: u8) -> ProviderDescriptor {
+  ProviderDescriptor::new(ProviderId::new(id), ProviderKind::InMemory, prio)
+}
+
 #[test]
-fn delivers_only_on_hash_change_and_records_metrics() {
-  let stream = Box::new(VecStream::new(vec![
+fn failover_switches_to_backup_and_continues_delivery() {
+  let primary_stream = Box::new(VecStream::new(vec![
     ProviderEvent::Snapshot(snapshot(1)),
-    ProviderEvent::Snapshot(snapshot(1)), // same hash, should be skipped
-    ProviderEvent::Snapshot(snapshot(2)), // new hash, should deliver
+    ProviderEvent::Snapshot(snapshot(1)), // same hash skip
+    ProviderEvent::Terminated { reason: ProviderTermination::Errored { reason: "gone".to_string() } },
   ]));
+  let backup_stream = Box::new(VecStream::new(vec![ProviderEvent::Snapshot(snapshot(2))]));
+
+  let mut cfg = FailoverConfig::default();
+  cfg.max_errors = 1;
+  let failover = FailoverController::new(vec![desc("primary", 10), desc("backup", 5)], cfg);
+
   let hub = Arc::new(ProviderWatchHub::new());
   let placement_port = Arc::new(RecordingPlacement::default());
   let partition_port = Arc::new(RecordingPartition::default());
@@ -89,32 +100,28 @@ fn delivers_only_on_hash_change_and_records_metrics() {
   let partition = Arc::new(PartitionManagerBridge::new(partition_port.clone()));
   let metrics = Arc::new(ProvisioningMetrics::new());
 
-  let mut driver = ProviderStreamDriver::new(stream, hub.clone(), placement.clone(), partition.clone(), metrics.clone());
-  let mut seq = 0;
+  let mut runner = ProviderStreamRunner::new(
+    failover,
+    vec![(desc("primary", 10), primary_stream), (desc("backup", 5), backup_stream)],
+    hub.clone(),
+    placement.clone(),
+    partition.clone(),
+    metrics.clone(),
+    Duration::from_secs(5),
+  );
 
-  assert!(matches!(driver.pump_once(&mut seq).unwrap(), StreamProgress::Advanced));
-  assert!(matches!(driver.pump_once(&mut seq).unwrap(), StreamProgress::Advanced));
-  assert!(matches!(driver.pump_once(&mut seq).unwrap(), StreamProgress::Advanced));
+  // primary delivers hash 1 then terminates -> switch to backup -> deliver hash 2
+  assert!(matches!(runner.pump_once(), RunnerProgress::Advanced));
+  assert!(matches!(runner.pump_once(), RunnerProgress::Advanced));
+  assert!(matches!(runner.pump_once(), RunnerProgress::Switched));
+  assert!(matches!(runner.pump_once(), RunnerProgress::Advanced));
 
-  // first and third snapshots delivered (hash 1 then 2)
   assert_eq!(vec![1, 2], *placement_port.snapshots.lock().unwrap());
   assert_eq!(vec![1, 2], *partition_port.snapshots.lock().unwrap());
-  assert_eq!(2, metrics.snapshot_latencies().len());
-}
+  assert_eq!(vec![("primary".to_string(), "backup".to_string())], *placement_port.changes.lock().unwrap());
+  assert_eq!(vec![("primary".to_string(), "backup".to_string())], *partition_port.changes.lock().unwrap());
 
-#[test]
-fn records_termination_and_interrupt_metric() {
-  let stream = Box::new(VecStream::new(vec![ProviderEvent::Terminated { reason: ProviderTermination::Ended }]));
-  let hub = Arc::new(ProviderWatchHub::new());
-  let placement = Arc::new(PlacementSupervisorBridge::new(Arc::new(RecordingPlacement::default())));
-  let partition = Arc::new(PartitionManagerBridge::new(Arc::new(RecordingPartition::default())));
-  let metrics = Arc::new(ProvisioningMetrics::new());
-
-  let mut driver = ProviderStreamDriver::new(stream, hub.clone(), placement, partition, metrics.clone());
-  let mut seq = 0;
-
-  assert!(matches!(driver.pump_once(&mut seq).unwrap(), StreamProgress::Terminated));
-
+  // termination retained for primary
   assert!(hub.termination().is_some());
-  assert_eq!(vec![0], metrics.interruptions());
+  assert_eq!(1, metrics.failovers().len());
 }

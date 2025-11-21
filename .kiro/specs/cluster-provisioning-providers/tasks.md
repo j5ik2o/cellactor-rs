@@ -12,7 +12,7 @@
   - _依存タスク: -_
   - _完了条件: 登録/保存/読込/重複検知/破損検知の単体テストが緑_
 
-- [ ] 1.2 ProviderValidator の設定検証と外部接続チェッカー
+- [x] 1.2 ProviderValidator の設定検証と外部接続チェッカー
   - 必須フィールド検証と名前衝突エラーを整備し、Consul/K8s 用の接続性チェックフックを用意する。
   - Unsupported capability（watch 無し等）を Disabled として理由を保持する。
   - _対応要件: 1.1, 1.3, 1.4_
@@ -38,7 +38,7 @@
   - _依存タスク: 2.1_
   - _完了条件: ヘルス遷移/バックオフ/フェイルオーバ/復帰のテストが緑_
 
-- [ ] 2.3 ProviderStream と Failover/WatchHub の統合
+- [x] 2.3 ProviderStream と Failover/WatchHub の統合
   - Provider run ループを実装し、スナップショットストリームとフェイルオーバ切替を順序保証付きで配信する。
   - Terminated 発生時の終了シグナル保持と最後のスナップショット供給を統合する。
   - _対応要件: 2.1, 2.2, 2.3, 2.4_
