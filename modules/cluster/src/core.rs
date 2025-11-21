@@ -16,3 +16,5 @@ pub mod placement;
 pub mod routing;
 /// Runtime container coordinating identity lookup and activation ledger.
 pub mod runtime;
+/// Provisioning abstractions for cluster providers.
+pub mod provisioning;

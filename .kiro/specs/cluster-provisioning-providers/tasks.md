@@ -5,14 +5,14 @@
   - _依存タスク: -_
   - _完了条件: 1.x 子タスク完了、Registry が永続化付きで起動・再起動後も同一セットを復元できること_
 
-- [ ] 1.1 ProviderRegistry と FileProviderStore の実装
+- [x] 1.1 ProviderRegistry と FileProviderStore の実装
   - Descriptor を登録・重複検知し、JSONL を tempfile+rename+fsync で原子的に保存/読込する。
   - ProviderStore 抽象を定義し、破損ファイル読込時は fail-fast でエラーを返す。
   - _対応要件: 1.1, 1.2, 1.5_
   - _依存タスク: -_
   - _完了条件: 登録/保存/読込/重複検知/破損検知の単体テストが緑_
 
-- [ ] 1.2 ProviderValidator の設定検証と外部接続チェッカー
+- [x] 1.2 ProviderValidator の設定検証と外部接続チェッカー
   - 必須フィールド検証と名前衝突エラーを整備し、Consul/K8s 用の接続性チェックフックを用意する。
   - Unsupported capability（watch 無し等）を Disabled として理由を保持する。
   - _対応要件: 1.1, 1.3, 1.4_
@@ -24,7 +24,7 @@
   - _依存タスク: 1.2_
   - _完了条件: 2.x 子タスク完了、優先度付きフェイルオーバが動作しスナップショット供給が継続すること_
 
-- [ ] 2.1 ProviderStream/ProviderEvent 実装と WatchHub 配信
+- [x] 2.1 ProviderStream/ProviderEvent 実装と WatchHub 配信
   - ProviderEvent(Snapshot/Terminated) を処理し、最新スナップショットと終了シグナルを保持して Placement/Partition/Remoting ブリッジへ配信する。
   - ハッシュ不変時はキャッシュ再利用、ハッシュ変化時は無効化フラグを立てる。
   - _対応要件: 2.1, 2.2, 2.3_
