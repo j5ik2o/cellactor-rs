@@ -24,7 +24,7 @@
   - _依存タスク: 1.2_
   - _完了条件: 2.x 子タスク完了、優先度付きフェイルオーバが動作しスナップショット供給が継続すること_
 
-- [ ] 2.1 ProviderStream/ProviderEvent 実装と WatchHub 配信
+- [x] 2.1 ProviderStream/ProviderEvent 実装と WatchHub 配信
   - ProviderEvent(Snapshot/Terminated) を処理し、最新スナップショットと終了シグナルを保持して Placement/Partition/Remoting ブリッジへ配信する。
   - ハッシュ不変時はキャッシュ再利用、ハッシュ変化時は無効化フラグを立てる。
   - _対応要件: 2.1, 2.2, 2.3_
