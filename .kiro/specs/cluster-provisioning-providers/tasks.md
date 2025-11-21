@@ -38,24 +38,24 @@
   - _依存タスク: 2.1_
   - _完了条件: ヘルス遷移/バックオフ/フェイルオーバ/復帰のテストが緑_
 
-- [ ] 3. Placement / Partition ブリッジ連携
+- [x] 3. Placement / Partition ブリッジ連携
   - _対応要件: 3.1, 3.2, 3.3, 3.4, 3.5_
   - _依存タスク: 2.2_
   - _完了条件: 3.x 子タスク完了、スナップショット適用・provider_changed 通知・Shutdown 拒否が動作すること_
 
-- [ ] 3.1 PlacementSupervisorBridge 実装
+- [x] 3.1 PlacementSupervisorBridge 実装
   - apply_snapshot と provider_changed を実装し、所有権再計算前提で順序保証（seq_no）を処理する。
   - _対応要件: 3.1, 3.4_
   - _依存タスク: 2.2_
   - _完了条件: スナップショット適用と provider_changed イベントの単体テストが緑_
 
-- [ ] 3.2 PartitionManagerBridge 実装
+- [x] 3.2 PartitionManagerBridge 実装
   - 最新スナップショット提供と provider_changed 通知を行い、不可時は理由付きで失敗させる。
   - _対応要件: 3.2, 3.4_
   - _依存タスク: 3.1_
   - _完了条件: 正常/スナップショット不足/切替通知のテストが緑_
 
-- [ ] 3.3 Graceful Shutdown 制御
+- [x] 3.3 Graceful Shutdown 制御
   - シャットダウン期間中は新規スナップショットを拒否し、最後のスナップショット保持でドレインを可能にする。
   - _対応要件: 3.5_
   - _依存タスク: 3.2_

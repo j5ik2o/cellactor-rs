@@ -16,8 +16,8 @@ fn sample_snapshot(hash: u64) -> ProviderSnapshot {
 fn stores_latest_snapshot() {
   let hub = ProviderWatchHub::new();
 
-  hub.apply_event(ProviderEvent::Snapshot(sample_snapshot(1)));
-  hub.apply_event(ProviderEvent::Snapshot(sample_snapshot(2)));
+  hub.apply_event(ProviderEvent::Snapshot(sample_snapshot(1))).unwrap();
+  hub.apply_event(ProviderEvent::Snapshot(sample_snapshot(2))).unwrap();
 
   let latest = hub.latest_snapshot().unwrap();
   assert_eq!(latest.hash, 2);
@@ -27,8 +27,18 @@ fn stores_latest_snapshot() {
 fn records_termination_reason() {
   let hub = ProviderWatchHub::new();
 
-  hub.apply_event(ProviderEvent::Terminated { reason: ProviderTermination::Errored { reason: "failed".to_string() } });
+  hub
+    .apply_event(ProviderEvent::Terminated { reason: ProviderTermination::Errored { reason: "failed".to_string() } })
+    .unwrap();
 
   let reason = hub.termination().unwrap();
   assert!(matches!(reason, ProviderTermination::Errored { .. }));
+}
+
+#[test]
+fn rejects_after_shutdown() {
+  let hub = ProviderWatchHub::new();
+  hub.begin_shutdown();
+  let err = hub.apply_event(ProviderEvent::Snapshot(sample_snapshot(3))).unwrap_err();
+  assert!(matches!(err, crate::std::provisioning::provider_watch_hub::WatchError::ShuttingDown));
 }
