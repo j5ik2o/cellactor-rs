@@ -4,3 +4,5 @@
 pub mod bootstrap;
 /// Metrics exporters and adapters for host environments.
 pub mod metrics;
+/// Cluster provisioning (providers registry/watch/failover).
+pub mod provisioning;
