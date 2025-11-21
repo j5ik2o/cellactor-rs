@@ -2,11 +2,12 @@
 
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::string::ToString;
-use crate::core::identity::NodeId;
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::core::provisioning::snapshot::ProviderSnapshot;
+use alloc::string::{String, ToString};
+
+use crate::core::{
+  identity::NodeId,
+  provisioning::{descriptor::ProviderId, snapshot::ProviderSnapshot},
+};
 
 /// Topology or control events emitted by providers.
 #[derive(Debug, Clone, PartialEq)]

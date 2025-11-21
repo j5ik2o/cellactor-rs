@@ -1,9 +1,15 @@
 use std::sync::{Arc, Mutex};
 
-use crate::core::identity::{ClusterNode, NodeId};
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::core::provisioning::snapshot::{ProviderHealth, ProviderSnapshot};
-use crate::std::provisioning::partition_manager_bridge::{PartitionManagerBridge, PartitionManagerError, PartitionManagerPort};
+use crate::{
+  core::{
+    identity::{ClusterNode, NodeId},
+    provisioning::{
+      descriptor::ProviderId,
+      snapshot::{ProviderHealth, ProviderSnapshot},
+    },
+  },
+  std::provisioning::partition_manager_bridge::{PartitionManagerBridge, PartitionManagerError, PartitionManagerPort},
+};
 
 fn snapshot(hash: u64) -> ProviderSnapshot {
   ProviderSnapshot {

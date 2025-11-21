@@ -6,12 +6,14 @@ extern crate std;
 use alloc::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::std::provisioning::partition_manager_bridge::{PartitionManagerBridge, PartitionManagerError};
-use crate::std::provisioning::placement_supervisor_bridge::{PlacementBridgeError, PlacementSupervisorBridge};
-use crate::std::provisioning::provider_event::ProviderEvent;
-use crate::std::provisioning::provider_stream::ProviderStream;
-use crate::std::provisioning::provider_watch_hub::{ProviderWatchHub, WatchError};
-use crate::std::provisioning::provisioning_metrics::ProvisioningMetrics;
+use crate::std::provisioning::{
+  partition_manager_bridge::{PartitionManagerBridge, PartitionManagerError},
+  placement_supervisor_bridge::{PlacementBridgeError, PlacementSupervisorBridge},
+  provider_event::ProviderEvent,
+  provider_stream::ProviderStream,
+  provider_watch_hub::{ProviderWatchHub, WatchError},
+  provisioning_metrics::ProvisioningMetrics,
+};
 
 /// ストリームを1ステップ駆動した結果。
 pub enum StreamProgress {
@@ -39,22 +41,22 @@ pub enum StreamError {
 
 /// ProviderStream をハブと各ブリッジへ中継する単純ドライバ。
 pub struct ProviderStreamDriver {
-  stream:        Box<dyn ProviderStream>,
-  hub:           Arc<ProviderWatchHub>,
-  placement:     Arc<PlacementSupervisorBridge>,
-  partition:     Arc<PartitionManagerBridge>,
-  metrics:       Arc<ProvisioningMetrics>,
-  started_at:    Instant,
+  stream:     Box<dyn ProviderStream>,
+  hub:        Arc<ProviderWatchHub>,
+  placement:  Arc<PlacementSupervisorBridge>,
+  partition:  Arc<PartitionManagerBridge>,
+  metrics:    Arc<ProvisioningMetrics>,
+  started_at: Instant,
 }
 
 impl ProviderStreamDriver {
   /// 新しいドライバを作成。
   pub fn new(
-    stream:    Box<dyn ProviderStream>,
-    hub:       Arc<ProviderWatchHub>,
+    stream: Box<dyn ProviderStream>,
+    hub: Arc<ProviderWatchHub>,
     placement: Arc<PlacementSupervisorBridge>,
     partition: Arc<PartitionManagerBridge>,
-    metrics:   Arc<ProvisioningMetrics>,
+    metrics: Arc<ProvisioningMetrics>,
   ) -> Self {
     Self { stream, hub, placement, partition, metrics, started_at: Instant::now() }
   }
@@ -66,13 +68,11 @@ impl ProviderStreamDriver {
     };
 
     match &event {
-      ProviderEvent::Snapshot(snapshot) => {
+      | ProviderEvent::Snapshot(snapshot) => {
         *seq_no = seq_no.saturating_add(1);
         // 記録: latency は簡易に取得時刻差を利用
         let now = Instant::now();
-        self
-          .metrics
-          .record_snapshot_latency(*seq_no, now.saturating_duration_since(self.started_at));
+        self.metrics.record_snapshot_latency(*seq_no, now.saturating_duration_since(self.started_at));
 
         self.hub.apply_event(event).map_err(StreamError::Watch)?;
 
@@ -86,7 +86,7 @@ impl ProviderStreamDriver {
         }
         Ok(StreamProgress::Advanced)
       },
-      ProviderEvent::Terminated { .. } => {
+      | ProviderEvent::Terminated { .. } => {
         self.hub.apply_event(event).map_err(StreamError::Watch)?;
         self.metrics.record_stream_interrupt(*seq_no);
         Ok(StreamProgress::Terminated)

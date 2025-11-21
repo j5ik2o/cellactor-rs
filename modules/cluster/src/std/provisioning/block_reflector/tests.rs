@@ -1,10 +1,18 @@
 use std::sync::Mutex;
 
-use crate::core::identity::{ClusterNode, NodeId};
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::core::provisioning::snapshot::{ProviderHealth, ProviderSnapshot};
-use crate::std::provisioning::block_reflector::apply_block_event;
-use crate::std::provisioning::provider_event::{RemoteTopologyEvent, RemoteTopologyKind};
+use crate::{
+  core::{
+    identity::{ClusterNode, NodeId},
+    provisioning::{
+      descriptor::ProviderId,
+      snapshot::{ProviderHealth, ProviderSnapshot},
+    },
+  },
+  std::provisioning::{
+    block_reflector::apply_block_event,
+    provider_event::{RemoteTopologyEvent, RemoteTopologyKind},
+  },
+};
 
 fn snapshot(health: ProviderHealth) -> ProviderSnapshot {
   ProviderSnapshot {

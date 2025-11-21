@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 
-use crate::core::identity::NodeId;
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::std::provisioning::{
-  provider_event::{RemoteTopologyEvent, RemoteTopologyKind},
-  remoting_bridge::{RemotingBridge, RemotingBridgeError},
-  remoting_health::{RemotingHealthMetrics, RemotingNodeStatus},
-  remoting_port::RemotingPort,
+use crate::{
+  core::{identity::NodeId, provisioning::descriptor::ProviderId},
+  std::provisioning::{
+    provider_event::{RemoteTopologyEvent, RemoteTopologyKind},
+    remoting_bridge::{RemotingBridge, RemotingBridgeError},
+    remoting_health::{RemotingHealthMetrics, RemotingNodeStatus},
+    remoting_port::RemotingPort,
+  },
 };
 
 struct RecordingPort {
@@ -21,10 +22,7 @@ impl RecordingPort {
 
 impl RemotingPort for RecordingPort {
   fn publish_remote_topology(&self, event: &RemoteTopologyEvent) {
-    self.events
-      .lock()
-      .unwrap()
-      .push((event.provider_id.as_str().to_string(), event.seq_no));
+    self.events.lock().unwrap().push((event.provider_id.as_str().to_string(), event.seq_no));
   }
 }
 

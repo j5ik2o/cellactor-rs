@@ -39,17 +39,18 @@ impl RemotingHealthMetrics {
   pub fn record_event(&self, event: &RemoteTopologyEvent) {
     let now = Instant::now();
     let status = match event.kind {
-      RemoteTopologyKind::Join | RemoteTopologyKind::Unblocked => RemotingNodeStatus::Up,
-      RemoteTopologyKind::Leave => RemotingNodeStatus::Down,
-      RemoteTopologyKind::Blocked => RemotingNodeStatus::Degraded,
+      | RemoteTopologyKind::Join | RemoteTopologyKind::Unblocked => RemotingNodeStatus::Up,
+      | RemoteTopologyKind::Leave => RemotingNodeStatus::Down,
+      | RemoteTopologyKind::Blocked => RemotingNodeStatus::Degraded,
     };
     // BTreeMap は interior mutability ではないので再構成
     // （頻度は低い前提のため clone+insert を許容）
     let mut new_map = self.map.clone();
-    new_map.insert(
-      event.node_id.as_str().to_string(),
-      RemotingHealthEntry { node_id: event.node_id.as_str().to_string(), status, last_updated: now },
-    );
+    new_map.insert(event.node_id.as_str().to_string(), RemotingHealthEntry {
+      node_id: event.node_id.as_str().to_string(),
+      status,
+      last_updated: now,
+    });
     // replace
     // Safety: レースは無い前提（ブリッジ単一スレッド利用）
     unsafe {

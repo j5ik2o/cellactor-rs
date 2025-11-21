@@ -3,11 +3,12 @@
 extern crate alloc;
 extern crate std;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{
+  Arc, Mutex, RwLock,
+  atomic::{AtomicBool, Ordering},
+};
 
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::core::provisioning::snapshot::ProviderSnapshot;
+use crate::core::provisioning::{descriptor::ProviderId, snapshot::ProviderSnapshot};
 
 /// PartitionManager consumer to receive updates.
 pub trait PartitionManagerPort: Send + Sync {
@@ -47,20 +48,11 @@ pub enum PartitionManagerError {
 impl PartitionManagerBridge {
   /// Create bridge with empty snapshot cache.
   pub fn new(port: Arc<dyn PartitionManagerPort>) -> Self {
-    Self {
-      port,
-      latest: RwLock::new(None),
-      last_seq: Mutex::new(0),
-      shutting_down: AtomicBool::new(false),
-    }
+    Self { port, latest: RwLock::new(None), last_seq: Mutex::new(0), shutting_down: AtomicBool::new(false) }
   }
 
   /// Apply a snapshot, caching and forwarding if sequence is newer.
-  pub fn apply_snapshot(
-    &self,
-    seq_no:   u64,
-    snapshot: ProviderSnapshot,
-  ) -> Result<(), PartitionManagerError> {
+  pub fn apply_snapshot(&self, seq_no: u64, snapshot: ProviderSnapshot) -> Result<(), PartitionManagerError> {
     self.guard(seq_no)?;
     {
       let mut latest = self.latest.write().expect("poisoned");
@@ -72,21 +64,11 @@ impl PartitionManagerBridge {
 
   /// Return the latest cached snapshot or fail with `NoSnapshot`.
   pub fn latest_snapshot(&self) -> Result<ProviderSnapshot, PartitionManagerError> {
-    self
-      .latest
-      .read()
-      .expect("poisoned")
-      .clone()
-      .ok_or(PartitionManagerError::NoSnapshot)
+    self.latest.read().expect("poisoned").clone().ok_or(PartitionManagerError::NoSnapshot)
   }
 
   /// Notify partition manager of provider change respecting ordering.
-  pub fn provider_changed(
-    &self,
-    seq_no: u64,
-    from:   ProviderId,
-    to:     ProviderId,
-  ) -> Result<(), PartitionManagerError> {
+  pub fn provider_changed(&self, seq_no: u64, from: ProviderId, to: ProviderId) -> Result<(), PartitionManagerError> {
     self.guard(seq_no)?;
     self.port.provider_changed(from, to);
     Ok(())

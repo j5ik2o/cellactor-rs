@@ -1,7 +1,13 @@
-use crate::core::identity::{ClusterNode, NodeId};
-use crate::core::provisioning::snapshot::{ProviderHealth, ProviderSnapshot};
-use crate::std::provisioning::provider_event::{ProviderEvent, ProviderTermination};
-use crate::std::provisioning::provider_watch_hub::ProviderWatchHub;
+use crate::{
+  core::{
+    identity::{ClusterNode, NodeId},
+    provisioning::snapshot::{ProviderHealth, ProviderSnapshot},
+  },
+  std::provisioning::{
+    provider_event::{ProviderEvent, ProviderTermination},
+    provider_watch_hub::ProviderWatchHub,
+  },
+};
 
 fn sample_snapshot(hash: u64) -> ProviderSnapshot {
   ProviderSnapshot {

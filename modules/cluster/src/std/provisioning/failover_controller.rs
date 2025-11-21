@@ -6,8 +6,7 @@ extern crate std;
 use alloc::vec::Vec;
 use std::time::{Duration, Instant};
 
-use crate::core::provisioning::descriptor::ProviderDescriptor;
-use crate::core::provisioning::snapshot::ProviderHealth;
+use crate::core::provisioning::{descriptor::ProviderDescriptor, snapshot::ProviderHealth};
 
 /// フェイルオーバ設定。
 #[derive(Clone, Debug)]
@@ -38,24 +37,31 @@ impl Default for FailoverConfig {
 
 #[derive(Clone, Debug)]
 struct ProviderState {
-  descriptor:   ProviderDescriptor,
-  errors:       u32,
-  backoff:      Duration,
-  last_failure: Option<Instant>,
+  descriptor:    ProviderDescriptor,
+  errors:        u32,
+  backoff:       Duration,
+  last_failure:  Option<Instant>,
   next_retry_at: Option<Instant>,
-  health:       ProviderHealth,
+  health:        ProviderHealth,
 }
 
 impl ProviderState {
   fn new(descriptor: ProviderDescriptor, cfg: &FailoverConfig) -> Self {
-    Self { descriptor, errors: 0, backoff: cfg.backoff_init, last_failure: None, next_retry_at: None, health: ProviderHealth::Healthy }
+    Self {
+      descriptor,
+      errors: 0,
+      backoff: cfg.backoff_init,
+      last_failure: None,
+      next_retry_at: None,
+      health: ProviderHealth::Healthy,
+    }
   }
 }
 
 /// 優先度付きフェイルオーバ制御。
 pub struct FailoverController {
-  cfg:     FailoverConfig,
-  states:  Vec<ProviderState>,
+  cfg:    FailoverConfig,
+  states: Vec<ProviderState>,
 }
 
 impl FailoverController {

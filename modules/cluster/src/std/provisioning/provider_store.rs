@@ -3,10 +3,16 @@
 extern crate alloc;
 extern crate std;
 
-use alloc::{string::String, string::ToString, vec::Vec};
-use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Write};
-use std::path::PathBuf;
+use alloc::{
+  string::{String, ToString},
+  vec::Vec,
+};
+use std::{
+  fs::{File, OpenOptions},
+  io::{BufReader, Write},
+  path::PathBuf,
+};
+
 use serde_json::Deserializer;
 
 use crate::core::provisioning::descriptor::ProviderDescriptor;

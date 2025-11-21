@@ -1,18 +1,28 @@
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::{
+  sync::{Arc, Mutex},
+  time::Duration,
+};
 
-use fraktor_cluster_rs::core::identity::{ClusterNode, NodeId};
-use fraktor_cluster_rs::core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind};
-use fraktor_cluster_rs::core::provisioning::snapshot::{ProviderHealth, ProviderSnapshot};
-use fraktor_cluster_rs::std::provisioning::block_reflector::apply_block_event;
-use fraktor_cluster_rs::std::provisioning::failover_controller::{FailoverConfig, FailoverController};
-use fraktor_cluster_rs::std::provisioning::placement_supervisor_bridge::PlacementSupervisorBridge;
-use fraktor_cluster_rs::std::provisioning::partition_manager_bridge::PartitionManagerBridge;
-use fraktor_cluster_rs::std::provisioning::provider_event::{ProviderEvent, ProviderTermination, RemoteTopologyEvent, RemoteTopologyKind};
-use fraktor_cluster_rs::std::provisioning::provider_watch_hub::ProviderWatchHub;
-use fraktor_cluster_rs::std::provisioning::provisioning_metrics::ProvisioningMetrics;
-use fraktor_cluster_rs::std::provisioning::remoting_bridge::RemotingBridge;
-use fraktor_cluster_rs::std::provisioning::remoting_port::RemotingPort;
+use fraktor_cluster_rs::{
+  core::{
+    identity::{ClusterNode, NodeId},
+    provisioning::{
+      descriptor::{ProviderDescriptor, ProviderId, ProviderKind},
+      snapshot::{ProviderHealth, ProviderSnapshot},
+    },
+  },
+  std::provisioning::{
+    block_reflector::apply_block_event,
+    failover_controller::{FailoverConfig, FailoverController},
+    partition_manager_bridge::PartitionManagerBridge,
+    placement_supervisor_bridge::PlacementSupervisorBridge,
+    provider_event::{ProviderEvent, ProviderTermination, RemoteTopologyEvent, RemoteTopologyKind},
+    provider_watch_hub::ProviderWatchHub,
+    provisioning_metrics::ProvisioningMetrics,
+    remoting_bridge::RemotingBridge,
+    remoting_port::RemotingPort,
+  },
+};
 
 fn snapshot(hash: u64, health: ProviderHealth) -> ProviderSnapshot {
   ProviderSnapshot {
@@ -40,11 +50,7 @@ impl fraktor_cluster_rs::std::provisioning::placement_supervisor_bridge::Placeme
   }
 
   fn provider_changed(&self, from: ProviderId, to: ProviderId) {
-    self
-      .changes
-      .lock()
-      .unwrap()
-      .push((from.as_str().to_string(), to.as_str().to_string()));
+    self.changes.lock().unwrap().push((from.as_str().to_string(), to.as_str().to_string()));
   }
 }
 
@@ -65,11 +71,7 @@ impl fraktor_cluster_rs::std::provisioning::partition_manager_bridge::PartitionM
   }
 
   fn provider_changed(&self, from: ProviderId, to: ProviderId) {
-    self
-      .changes
-      .lock()
-      .unwrap()
-      .push((from.as_str().to_string(), to.as_str().to_string()));
+    self.changes.lock().unwrap().push((from.as_str().to_string(), to.as_str().to_string()));
   }
 }
 
@@ -85,11 +87,7 @@ impl RecordingRemotingPort {
 
 impl RemotingPort for RecordingRemotingPort {
   fn publish_remote_topology(&self, event: &RemoteTopologyEvent) {
-    self
-      .events
-      .lock()
-      .unwrap()
-      .push((event.provider_id.as_str().to_string(), event.seq_no));
+    self.events.lock().unwrap().push((event.provider_id.as_str().to_string(), event.seq_no));
   }
 }
 
@@ -149,7 +147,11 @@ fn end_to_end_failover_and_notifications() {
   metrics.record_stream_interrupt(seq2);
 
   // termination signal retained in hub
-  hub.apply_event(ProviderEvent::Terminated { reason: ProviderTermination::Errored { reason: "stream closed".to_string() } }).unwrap();
+  hub
+    .apply_event(ProviderEvent::Terminated {
+      reason: ProviderTermination::Errored { reason: "stream closed".to_string() },
+    })
+    .unwrap();
   assert!(hub.termination().is_some());
 
   // assertions

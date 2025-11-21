@@ -1,9 +1,17 @@
 use std::sync::{Arc, Mutex};
 
-use crate::core::identity::{ClusterNode, NodeId};
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::core::provisioning::snapshot::{ProviderHealth, ProviderSnapshot};
-use crate::std::provisioning::placement_supervisor_bridge::{PlacementBridgeError, PlacementSupervisorBridge, PlacementSupervisorPort};
+use crate::{
+  core::{
+    identity::{ClusterNode, NodeId},
+    provisioning::{
+      descriptor::ProviderId,
+      snapshot::{ProviderHealth, ProviderSnapshot},
+    },
+  },
+  std::provisioning::placement_supervisor_bridge::{
+    PlacementBridgeError, PlacementSupervisorBridge, PlacementSupervisorPort,
+  },
+};
 
 struct RecordingPort {
   snapshots: Mutex<Vec<u64>>,

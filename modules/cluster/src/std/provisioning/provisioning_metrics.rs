@@ -4,8 +4,7 @@ extern crate alloc;
 extern crate std;
 
 use alloc::vec::Vec;
-use std::sync::Mutex;
-use std::time::Duration;
+use std::{sync::Mutex, time::Duration};
 
 /// Captures provisioning-related counters and timings.
 pub struct ProvisioningMetrics {

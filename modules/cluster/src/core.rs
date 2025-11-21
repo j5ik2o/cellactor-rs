@@ -12,9 +12,9 @@ pub mod identity;
 pub mod metrics;
 /// Placement coordination and activation drivers.
 pub mod placement;
+/// Provisioning abstractions for cluster providers.
+pub mod provisioning;
 /// Routing helpers such as PID caches.
 pub mod routing;
 /// Runtime container coordinating identity lookup and activation ledger.
 pub mod runtime;
-/// Provisioning abstractions for cluster providers.
-pub mod provisioning;

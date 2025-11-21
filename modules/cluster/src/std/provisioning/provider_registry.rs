@@ -3,13 +3,19 @@
 extern crate alloc;
 extern crate std;
 
-use alloc::{string::String, string::ToString, vec::Vec};
-use std::collections::HashMap;
-use std::sync::RwLock;
+use alloc::{
+  string::{String, ToString},
+  vec::Vec,
+};
+use std::{collections::HashMap, sync::RwLock};
 
-use crate::core::provisioning::descriptor::ProviderDescriptor;
-use crate::std::provisioning::provider_store::ProviderStore;
-use crate::std::provisioning::provider_validator::{CapabilityChecker, ConnectivityChecker, ProviderValidator, ValidationResult};
+use crate::{
+  core::provisioning::descriptor::ProviderDescriptor,
+  std::provisioning::{
+    provider_store::ProviderStore,
+    provider_validator::{CapabilityChecker, ConnectivityChecker, ProviderValidator, ValidationResult},
+  },
+};
 
 /// Registry 操作時のエラー。
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
@@ -26,24 +32,23 @@ type StoreResult<T> = Result<T, ProviderRegistryError>;
 
 /// Provider の登録と永続化を担う。
 pub struct ProviderRegistry<S: ProviderStore> {
-  store:  S,
-  map:    RwLock<HashMap<String, ValidationResult>>,
+  store: S,
+  map:   RwLock<HashMap<String, ValidationResult>>,
 }
 
 impl<S: ProviderStore> ProviderRegistry<S> {
   /// ストアからロードして新規作成。
   pub fn new(store: S) -> Result<Self, ProviderRegistryError> {
-    let descriptors = store
-      .load_descriptors()
-      .map_err(|e: crate::std::provisioning::provider_store::ProviderStoreError| {
+    let descriptors =
+      store.load_descriptors().map_err(|e: crate::std::provisioning::provider_store::ProviderStoreError| {
         ProviderRegistryError::Store(e.to_string())
       })?;
     let mut map = HashMap::new();
     for desc in descriptors {
-      map.insert(
-        desc.id().as_str().to_string(),
-        ValidationResult { descriptor: desc.clone(), disabled_reason: None },
-      );
+      map.insert(desc.id().as_str().to_string(), ValidationResult {
+        descriptor:      desc.clone(),
+        disabled_reason: None,
+      });
     }
     Ok(Self { store, map: RwLock::new(map) })
   }
@@ -58,9 +63,7 @@ impl<S: ProviderStore> ProviderRegistry<S> {
     if guard.contains_key(descriptor.id().as_str()) {
       return Err(ProviderRegistryError::Duplicate(descriptor.id().as_str().to_string()));
     }
-    let validated = validator
-      .validate(&descriptor)
-      .map_err(|e| ProviderRegistryError::Store(e.to_string()))?;
+    let validated = validator.validate(&descriptor).map_err(|e| ProviderRegistryError::Store(e.to_string()))?;
     guard.insert(descriptor.id().as_str().to_string(), validated);
     self.persist_locked(&guard)
   }
@@ -86,12 +89,9 @@ impl<S: ProviderStore> ProviderRegistry<S> {
   fn persist_locked(&self, map: &HashMap<String, ValidationResult>) -> StoreResult<()> {
     let mut list: Vec<ProviderDescriptor> = map.values().map(|v| v.descriptor.clone()).collect();
     list.sort_by_key(|d: &ProviderDescriptor| d.id().as_str().to_string());
-    self
-      .store
-      .save_descriptors(&list)
-      .map_err(|e: crate::std::provisioning::provider_store::ProviderStoreError| {
-        ProviderRegistryError::Store(e.to_string())
-      })
+    self.store.save_descriptors(&list).map_err(|e: crate::std::provisioning::provider_store::ProviderStoreError| {
+      ProviderRegistryError::Store(e.to_string())
+    })
   }
 }
 

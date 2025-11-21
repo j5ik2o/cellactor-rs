@@ -1,14 +1,17 @@
-use crate::core::identity::NodeId;
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::std::provisioning::provider_event::{RemoteTopologyEvent, RemoteTopologyKind};
-use crate::std::provisioning::remoting_health::{RemotingHealthMetrics, RemotingNodeStatus};
+use crate::{
+  core::{identity::NodeId, provisioning::descriptor::ProviderId},
+  std::provisioning::{
+    provider_event::{RemoteTopologyEvent, RemoteTopologyKind},
+    remoting_health::{RemotingHealthMetrics, RemotingNodeStatus},
+  },
+};
 
 fn evt(kind: RemoteTopologyKind) -> RemoteTopologyEvent {
   RemoteTopologyEvent {
-    seq_no:        1,
-    provider_id:   ProviderId::new("p1"),
+    seq_no: 1,
+    provider_id: ProviderId::new("p1"),
     snapshot_hash: 5,
-    node_id:       NodeId::new("n42"),
+    node_id: NodeId::new("n42"),
     kind,
   }
 }

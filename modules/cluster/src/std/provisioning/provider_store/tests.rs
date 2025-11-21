@@ -2,8 +2,10 @@ use std::fs;
 
 use tempfile::tempdir;
 
-use crate::core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind};
-use crate::std::provisioning::provider_store::{FileProviderStore, ProviderStore, ProviderStoreError};
+use crate::{
+  core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind},
+  std::provisioning::provider_store::{FileProviderStore, ProviderStore, ProviderStoreError},
+};
 
 fn sample_desc(id: &str, prio: u8) -> ProviderDescriptor {
   ProviderDescriptor::new(ProviderId::new(id), ProviderKind::InMemory, prio)

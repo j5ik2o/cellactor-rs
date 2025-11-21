@@ -1,16 +1,26 @@
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::{
+  sync::{Arc, Mutex},
+  time::Duration,
+};
 
-use crate::core::identity::{ClusterNode, NodeId};
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::core::provisioning::snapshot::{ProviderHealth, ProviderSnapshot};
-use crate::std::provisioning::partition_manager_bridge::{PartitionManagerBridge, PartitionManagerPort};
-use crate::std::provisioning::placement_supervisor_bridge::{PlacementSupervisorBridge, PlacementSupervisorPort};
-use crate::std::provisioning::provider_event::{ProviderEvent, ProviderTermination};
-use crate::std::provisioning::provider_stream::ProviderStream;
-use crate::std::provisioning::provider_stream_driver::{ProviderStreamDriver, StreamProgress};
-use crate::std::provisioning::provider_watch_hub::ProviderWatchHub;
-use crate::std::provisioning::provisioning_metrics::ProvisioningMetrics;
+use crate::{
+  core::{
+    identity::{ClusterNode, NodeId},
+    provisioning::{
+      descriptor::ProviderId,
+      snapshot::{ProviderHealth, ProviderSnapshot},
+    },
+  },
+  std::provisioning::{
+    partition_manager_bridge::{PartitionManagerBridge, PartitionManagerPort},
+    placement_supervisor_bridge::{PlacementSupervisorBridge, PlacementSupervisorPort},
+    provider_event::{ProviderEvent, ProviderTermination},
+    provider_stream::ProviderStream,
+    provider_stream_driver::{ProviderStreamDriver, StreamProgress},
+    provider_watch_hub::ProviderWatchHub,
+    provisioning_metrics::ProvisioningMetrics,
+  },
+};
 
 fn snapshot(hash: u64) -> ProviderSnapshot {
   ProviderSnapshot {
@@ -89,7 +99,8 @@ fn delivers_only_on_hash_change_and_records_metrics() {
   let partition = Arc::new(PartitionManagerBridge::new(partition_port.clone()));
   let metrics = Arc::new(ProvisioningMetrics::new());
 
-  let mut driver = ProviderStreamDriver::new(stream, hub.clone(), placement.clone(), partition.clone(), metrics.clone());
+  let mut driver =
+    ProviderStreamDriver::new(stream, hub.clone(), placement.clone(), partition.clone(), metrics.clone());
   let mut seq = 0;
 
   assert!(matches!(driver.pump_once(&mut seq).unwrap(), StreamProgress::Advanced));

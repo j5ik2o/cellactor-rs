@@ -3,11 +3,12 @@
 extern crate alloc;
 extern crate std;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+  Arc, Mutex,
+  atomic::{AtomicBool, Ordering},
+};
 
-use crate::core::provisioning::descriptor::ProviderId;
-use crate::core::provisioning::snapshot::ProviderSnapshot;
+use crate::core::provisioning::{descriptor::ProviderId, snapshot::ProviderSnapshot};
 
 /// PlacementSupervisor consumer that actually applies ownership recalculation.
 pub trait PlacementSupervisorPort: Send + Sync {
@@ -47,23 +48,14 @@ impl PlacementSupervisorBridge {
   }
 
   /// Apply a snapshot if `seq_no` is strictly increasing.
-  pub fn apply_snapshot(
-    &self,
-    seq_no:    u64,
-    snapshot:  &ProviderSnapshot,
-  ) -> Result<(), PlacementBridgeError> {
+  pub fn apply_snapshot(&self, seq_no: u64, snapshot: &ProviderSnapshot) -> Result<(), PlacementBridgeError> {
     self.guard(seq_no)?;
     self.port.apply_snapshot(snapshot);
     Ok(())
   }
 
   /// Notify provider change with ordering guarantees.
-  pub fn provider_changed(
-    &self,
-    seq_no: u64,
-    from:   ProviderId,
-    to:     ProviderId,
-  ) -> Result<(), PlacementBridgeError> {
+  pub fn provider_changed(&self, seq_no: u64, from: ProviderId, to: ProviderId) -> Result<(), PlacementBridgeError> {
     self.guard(seq_no)?;
     self.port.provider_changed(from, to);
     Ok(())

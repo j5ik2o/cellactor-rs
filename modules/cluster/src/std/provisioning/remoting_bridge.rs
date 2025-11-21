@@ -4,19 +4,19 @@ extern crate alloc;
 extern crate std;
 
 use alloc::string::String;
-use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::{
+  collections::HashSet,
+  sync::{Arc, Mutex},
+};
 
 use crate::std::provisioning::{
-  provider_event::RemoteTopologyEvent,
-  remoting_health::RemotingHealthMetrics,
-  remoting_port::RemotingPort,
+  provider_event::RemoteTopologyEvent, remoting_health::RemotingHealthMetrics, remoting_port::RemotingPort,
 };
 
 /// Remoting への送信をラップし冪等性を保証する。
 pub struct RemotingBridge {
-  port: Arc<dyn RemotingPort>,
-  seen: Mutex<HashSet<(String, u64)>>,
+  port:   Arc<dyn RemotingPort>,
+  seen:   Mutex<HashSet<(String, u64)>>,
   health: Option<Arc<RemotingHealthMetrics>>,
 }
 

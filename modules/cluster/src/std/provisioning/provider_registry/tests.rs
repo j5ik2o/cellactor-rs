@@ -1,10 +1,12 @@
 use tempfile::tempdir;
 
-use crate::core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind};
-use crate::std::provisioning::provider_registry::{ProviderRegistry, ProviderRegistryError};
-use crate::std::provisioning::provider_store::FileProviderStore;
-use crate::std::provisioning::provider_validator::{
-  CapabilityChecker, ConnectivityChecker, ProviderValidator, ValidationResult,
+use crate::{
+  core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind},
+  std::provisioning::{
+    provider_registry::{ProviderRegistry, ProviderRegistryError},
+    provider_store::FileProviderStore,
+    provider_validator::{CapabilityChecker, ConnectivityChecker, ProviderValidator, ValidationResult},
+  },
 };
 
 fn registry() -> (ProviderRegistry<FileProviderStore>, std::path::PathBuf, tempfile::TempDir) {

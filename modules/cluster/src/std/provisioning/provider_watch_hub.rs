@@ -5,8 +5,10 @@ extern crate std;
 
 use std::sync::RwLock;
 
-use crate::core::provisioning::snapshot::ProviderSnapshot;
-use crate::std::provisioning::provider_event::{ProviderEvent, ProviderTermination};
+use crate::{
+  core::provisioning::snapshot::ProviderSnapshot,
+  std::provisioning::provider_event::{ProviderEvent, ProviderTermination},
+};
 
 /// In-memory hub that keeps the latest snapshot and termination info.
 pub struct ProviderWatchHub {
@@ -35,7 +37,7 @@ impl ProviderWatchHub {
       return Err(WatchError::ShuttingDown);
     }
     match event {
-      ProviderEvent::Snapshot(s) => {
+      | ProviderEvent::Snapshot(s) => {
         let mut latest = self.latest.write().expect("poison");
         let mut last_hash = self.last_hash.write().expect("poison");
         let mut last_invalid = self.last_invalid.write().expect("poison");
@@ -45,7 +47,7 @@ impl ProviderWatchHub {
         *last_hash = Some(s.hash);
         *latest = Some(s);
       },
-      ProviderEvent::Terminated { reason } => {
+      | ProviderEvent::Terminated { reason } => {
         let mut term = self.terminated.write().expect("poison");
         *term = Some(reason);
       },

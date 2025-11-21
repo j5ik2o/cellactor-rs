@@ -1,8 +1,12 @@
 use std::time::Duration;
 
-use crate::core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind};
-use crate::core::provisioning::snapshot::ProviderHealth;
-use crate::std::provisioning::failover_controller::{FailoverConfig, FailoverController};
+use crate::{
+  core::provisioning::{
+    descriptor::{ProviderDescriptor, ProviderId, ProviderKind},
+    snapshot::ProviderHealth,
+  },
+  std::provisioning::failover_controller::{FailoverConfig, FailoverController},
+};
 
 fn desc(id: &str, prio: u8) -> ProviderDescriptor {
   ProviderDescriptor::new(ProviderId::new(id), ProviderKind::InMemory, prio)

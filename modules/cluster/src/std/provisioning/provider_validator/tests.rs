@@ -1,8 +1,10 @@
-use crate::core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind};
-use crate::std::provisioning::provider_validator::{
-  CapabilityChecker, ConnectivityChecker, ProviderValidator, ValidationResult,
+use crate::{
+  core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind},
+  std::provisioning::{
+    provider_validator::{CapabilityChecker, ConnectivityChecker, ProviderValidator, ValidationResult},
+    provisioning_error::{ProvisioningError, ProvisioningErrorCode},
+  },
 };
-use crate::std::provisioning::provisioning_error::{ProvisioningError, ProvisioningErrorCode};
 
 struct OkChecker;
 impl ConnectivityChecker for OkChecker {
@@ -33,8 +35,7 @@ impl CapabilityChecker for WatchCapMissing {
 }
 
 fn desc(kind: ProviderKind) -> ProviderDescriptor {
-  ProviderDescriptor::new(ProviderId::new("provider"), kind, 1)
-    .with_endpoint("http://endpoint")
+  ProviderDescriptor::new(ProviderId::new("provider"), kind, 1).with_endpoint("http://endpoint")
 }
 
 #[test]
@@ -57,7 +58,10 @@ fn missing_endpoint_for_consul_is_rejected() {
   let validator = ProviderValidator::new(OkChecker, WatchCapOk);
   let bad = ProviderDescriptor::new(ProviderId::new("consul"), ProviderKind::Consul, 1);
   let err = validator.validate(&bad).unwrap_err();
-  assert_eq!(ProvisioningError { code: ProvisioningErrorCode::Validation, message: "missing endpoint".to_string() }, err);
+  assert_eq!(
+    ProvisioningError { code: ProvisioningErrorCode::Validation, message: "missing endpoint".to_string() },
+    err
+  );
 }
 
 #[test]

@@ -4,8 +4,10 @@ extern crate alloc;
 
 use alloc::string::String;
 
-use crate::core::provisioning::descriptor::{ProviderDescriptor, ProviderKind};
-use crate::std::provisioning::provisioning_error::{ProvisioningError, ProvisioningErrorCode};
+use crate::{
+  core::provisioning::descriptor::{ProviderDescriptor, ProviderKind},
+  std::provisioning::provisioning_error::{ProvisioningError, ProvisioningErrorCode},
+};
 
 /// 外部接続チェッカー。
 pub trait ConnectivityChecker: Send + Sync {
@@ -47,10 +49,7 @@ impl<C: ConnectivityChecker, K: CapabilityChecker> ProviderValidator<C, K> {
       }
     }
 
-    self
-      .connectivity
-      .check(descriptor)
-      .map_err(|e| ProvisioningError::new(ProvisioningErrorCode::Connectivity, e))?;
+    self.connectivity.check(descriptor).map_err(|e| ProvisioningError::new(ProvisioningErrorCode::Connectivity, e))?;
 
     let disabled_reason = self.capability.check(descriptor).err();
 
