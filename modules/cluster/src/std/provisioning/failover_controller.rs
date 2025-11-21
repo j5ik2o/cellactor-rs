@@ -42,18 +42,13 @@ struct ProviderState {
   errors:       u32,
   backoff:      Duration,
   last_failure: Option<Instant>,
+  next_retry_at: Option<Instant>,
   health:       ProviderHealth,
 }
 
 impl ProviderState {
   fn new(descriptor: ProviderDescriptor, cfg: &FailoverConfig) -> Self {
-    Self {
-      descriptor,
-      errors:       0,
-      backoff:      cfg.backoff_init,
-      last_failure: None,
-      health:       ProviderHealth::Healthy,
-    }
+    Self { descriptor, errors: 0, backoff: cfg.backoff_init, last_failure: None, next_retry_at: None, health: ProviderHealth::Healthy }
   }
 }
 
@@ -81,12 +76,27 @@ impl FailoverController {
           state.backoff = self.cfg.backoff_init;
           state.health = ProviderHealth::Healthy;
           state.last_failure = None;
+          state.next_retry_at = None;
+        }
+      }
+      // backoff 突破までは Unreachable を維持
+      if let Some(until) = state.next_retry_at {
+        if now < until {
+          continue;
         }
       }
       // timeout-based degradation
       if let Some(last) = state.last_failure {
         if now.duration_since(last) >= self.cfg.timeout {
           state.health = ProviderHealth::Unreachable;
+          state.next_retry_at = Some(now + state.backoff);
+        }
+      }
+      // backoff 消化後は Degraded まで回復させる
+      if let Some(until) = state.next_retry_at {
+        if now >= until && matches!(state.health, ProviderHealth::Unreachable) {
+          state.health = ProviderHealth::Degraded;
+          state.next_retry_at = None;
         }
       }
     }
@@ -104,9 +114,22 @@ impl FailoverController {
         state.health = ProviderHealth::Unreachable;
         // backoff update
         state.backoff = (state.backoff * 2).min(self.cfg.backoff_max);
+        state.next_retry_at = Some(now + state.backoff);
       } else {
         state.health = ProviderHealth::Degraded;
       }
+    }
+  }
+
+  /// スナップショット遅延を記録し、閾値超過で Degraded にする。
+  pub fn record_snapshot_delay(&mut self, provider_id: &str, latency: Duration, threshold: Duration) {
+    if latency < threshold {
+      return;
+    }
+    let now = Instant::now();
+    if let Some(state) = self.states.iter_mut().find(|s| s.descriptor.id().as_str() == provider_id) {
+      state.health = ProviderHealth::Degraded;
+      state.last_failure = Some(now);
     }
   }
 
@@ -117,6 +140,7 @@ impl FailoverController {
       state.health = ProviderHealth::Healthy;
       state.backoff = self.cfg.backoff_init;
       state.last_failure = None;
+      state.next_retry_at = None;
     }
   }
 }
