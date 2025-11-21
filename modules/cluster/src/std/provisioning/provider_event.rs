@@ -1,9 +1,11 @@
-//! Provider events consumed by WatchHub.
+//! Provider events consumed by WatchHub and emitted to Remoting.
 
 extern crate alloc;
 
 use alloc::string::String;
+use alloc::string::ToString;
 use crate::core::identity::NodeId;
+use crate::core::provisioning::descriptor::ProviderId;
 use crate::core::provisioning::snapshot::ProviderSnapshot;
 
 /// Topology or control events emitted by providers.
@@ -30,15 +32,37 @@ pub enum ProviderTermination {
   },
 }
 
-/// Event delivered to Remoting about remote topology changes.
+/// Remote topology change propagated to Remoting side.
 #[derive(Debug, Clone, PartialEq)]
-pub enum RemoteTopologyEvent {
+pub struct RemoteTopologyEvent {
+  /// イベントシーケンス。冪等キーに利用する。
+  pub seq_no:        u64,
+  /// 発生元プロバイダ。
+  pub provider_id:   ProviderId,
+  /// 対象スナップショットのハッシュ。
+  pub snapshot_hash: u64,
+  /// 影響を受けるノード。
+  pub node_id:       NodeId,
+  /// イベントの種類。
+  pub kind:          RemoteTopologyKind,
+}
+
+impl RemoteTopologyEvent {
+  /// 冪等性を担保するキー (provider, seq_no)。
+  pub fn idempotency_key(&self) -> (String, u64) {
+    (self.provider_id.as_str().to_string(), self.seq_no)
+  }
+}
+
+/// 遠隔トポロジイベントの種類。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RemoteTopologyKind {
   /// ノード参加。
-  Join(NodeId),
+  Join,
   /// ノード離脱。
-  Leave(NodeId),
+  Leave,
   /// ノード隔離。
-  Blocked(NodeId),
+  Blocked,
   /// 隔離解除。
-  Unblocked(NodeId),
+  Unblocked,
 }

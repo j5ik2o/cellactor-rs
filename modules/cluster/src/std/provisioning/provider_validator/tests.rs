@@ -1,5 +1,6 @@
 use crate::core::provisioning::descriptor::{ProviderDescriptor, ProviderId, ProviderKind};
-use crate::std::provisioning::provider_validator::{ConnectivityChecker, ProviderValidationError, ProviderValidator};
+use crate::std::provisioning::provider_validator::{ConnectivityChecker, ProviderValidator};
+use crate::std::provisioning::provisioning_error::{ProvisioningError, ProvisioningErrorCode};
 
 struct OkChecker;
 impl ConnectivityChecker for OkChecker {
@@ -30,7 +31,8 @@ fn validates_inmemory_without_connectivity() {
 fn fails_on_connectivity_error() {
   let validator = ProviderValidator::new(FailChecker);
   let err = validator.validate(&desc(ProviderKind::Consul)).unwrap_err();
-  assert!(matches!(err, ProviderValidationError::Connectivity(msg) if msg == "no route"));
+  assert_eq!(ProvisioningErrorCode::Connectivity, err.code);
+  assert_eq!("no route", err.message);
 }
 
 #[test]
@@ -38,5 +40,5 @@ fn missing_endpoint_for_consul_is_rejected() {
   let validator = ProviderValidator::new(OkChecker);
   let bad = ProviderDescriptor::new(ProviderId::new("consul"), ProviderKind::Consul, 1);
   let err = validator.validate(&bad).unwrap_err();
-  assert_eq!(ProviderValidationError::MissingEndpoint, err);
+  assert_eq!(ProvisioningError { code: ProvisioningErrorCode::Validation, message: "missing endpoint".to_string() }, err);
 }

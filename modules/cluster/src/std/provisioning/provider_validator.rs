@@ -5,20 +5,7 @@ extern crate alloc;
 use alloc::string::String;
 
 use crate::core::provisioning::descriptor::{ProviderDescriptor, ProviderKind};
-
-/// バリデーションエラー。
-#[derive(thiserror::Error, Debug, PartialEq, Eq)]
-pub enum ProviderValidationError {
-  /// 必須エンドポイント欠落。
-  #[error("missing endpoint")]
-  MissingEndpoint,
-  /// 要求能力が満たされていない。
-  #[error("unsupported capability")]
-  UnsupportedCapability,
-  /// 接続性検証失敗。
-  #[error("connectivity check failed: {0}")]
-  Connectivity(String),
-}
+use crate::std::provisioning::provisioning_error::{ProvisioningError, ProvisioningErrorCode};
 
 /// 外部接続チェッカー。
 pub trait ConnectivityChecker: Send + Sync {
@@ -37,19 +24,19 @@ impl<C: ConnectivityChecker> ProviderValidator<C> {
     Self { checker }
   }
 
-  /// ディスクリプタを検証する。
-  pub fn validate(&self, descriptor: &ProviderDescriptor) -> Result<(), ProviderValidationError> {
+/// ディスクリプタを検証する。
+  pub fn validate(&self, descriptor: &ProviderDescriptor) -> Result<(), ProvisioningError> {
     // endpoint 必須 (Consul/K8s/custom で想定)。InMemory は不要。
     if matches!(descriptor.kind(), ProviderKind::Consul | ProviderKind::Kubernetes | ProviderKind::Custom(_)) {
       if descriptor.endpoint().is_none() || descriptor.endpoint().map(|e| e.is_empty()).unwrap_or(true) {
-        return Err(ProviderValidationError::MissingEndpoint);
+        return Err(ProvisioningError::new(ProvisioningErrorCode::Validation, "missing endpoint"));
       }
     }
 
     self
       .checker
       .check(descriptor)
-      .map_err(|e| ProviderValidationError::Connectivity(e))?;
+      .map_err(|e| ProvisioningError::new(ProvisioningErrorCode::Connectivity, e))?;
 
     Ok(())
   }

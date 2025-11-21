@@ -66,37 +66,37 @@
   - _依存タスク: 3.3_
   - _完了条件: 4.x 子タスク完了、RemoteTopology イベントが冪等・順序保証で配信されること_
 
-- [ ] 4.1 RemotingBridge と RemoteTopologyEvent 契約
+- [x] 4.1 RemotingBridge と RemoteTopologyEvent 契約
   - Join/Leave/Blocked/Unblocked を seq_no + snapshot_hash 付きで発行し、冪等キーを定義する。
   - Remoting 側が隔離ノードを再活性化できるようイベントハンドリング方針を明記する。
   - _対応要件: 4.1, 4.2, 4.4_
   - _依存タスク: 3.3_
   - _完了条件: イベントスキーマと冪等処理のテストが緑_
 
-- [ ] 4.2 Block/Unblock 反映と監視警告
+- [x] 4.2 Block/Unblock 反映と監視警告
   - 隔離ノードをスナップショットの blocked_nodes に反映し、Degraded 状態時は警告を発行する。
   - _対応要件: 4.2, 4.3_
   - _依存タスク: 4.1_
   - _完了条件: Block/Unblock の反映と警告出力のテストが緑_
 
-- [ ] 5. 観測・エラーハンドリング・フェイルセーフ
+- [x] 5. 観測・エラーハンドリング・フェイルセーフ
   - _対応要件: 5.1, 5.2, 5.3, 5.4, 5.5_
   - _依存タスク: 4.2_
   - _完了条件: 5.x 子タスク完了、メトリクスとエラーコードがフロー全体で利用可能になること_
 
-- [ ] 5.1 ProvisioningMetrics 拡張
+- [x] 5.1 ProvisioningMetrics 拡張
   - snapshot latency, failover count, stream interruption を計測し、seq_no と紐付けて観測できるようにする。
   - _対応要件: 5.1_
   - _依存タスク: 4.2_
   - _完了条件: メトリクス更新の単体テストが緑_
 
-- [ ] 5.2 ProvisioningError/イベントの構造化エラーコード
+- [x] 5.2 ProvisioningError/イベントの構造化エラーコード
   - validation/connectivity/stream failure を区別するエラーコードを定義し、イベントにも reason を含める。
   - _対応要件: 5.2, 5.5_
   - _依存タスク: 5.1_
   - _完了条件: エラーコードの単体テストとイベントへの反映を確認_
 
-- [ ] 5.3 全体統合・フェイルケーステスト
+- [x] 5.3 全体統合・フェイルケーステスト
   - in-memory + mock Consul/K8s で登録→watch→フェイルオーバ→Placement/Remoting 通知→shutdown の統合テストを追加し、index 巻き戻り・接続失敗・全プロバイダ枯渇の fail-fast を確認する。
   - _対応要件: 1系, 2系, 3系, 4系, 5系_
   - _依存タスク: 5.2_
