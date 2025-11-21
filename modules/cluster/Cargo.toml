@@ -31,3 +31,8 @@ serde_json = { version = "1.0", features = ["alloc"] }
 
 [dev-dependencies]
 tempfile = "3.10"
+
+[[test]]
+name = "provisioning_flow"
+path = "tests/provisioning_flow.rs"
+required-features = ["std"]

@@ -24,6 +24,24 @@ fn stores_latest_snapshot() {
 }
 
 #[test]
+fn reports_invalidation_on_hash_change() {
+  let hub = ProviderWatchHub::new();
+
+  hub.apply_event(ProviderEvent::Snapshot(sample_snapshot(10))).unwrap();
+  let (_, invalid) = hub.latest_snapshot_with_invalidation().unwrap();
+  assert!(!invalid, "initial snapshot should not mark invalidation");
+
+  hub.apply_event(ProviderEvent::Snapshot(sample_snapshot(11))).unwrap();
+  let (_, invalid2) = hub.latest_snapshot_with_invalidation().unwrap();
+  assert!(invalid2, "hash change should mark invalidation");
+
+  // same hash again resets invalidation
+  hub.apply_event(ProviderEvent::Snapshot(sample_snapshot(11))).unwrap();
+  let (_, invalid3) = hub.latest_snapshot_with_invalidation().unwrap();
+  assert!(!invalid3, "same hash should be treated as cache hit");
+}
+
+#[test]
 fn records_termination_reason() {
   let hub = ProviderWatchHub::new();
 

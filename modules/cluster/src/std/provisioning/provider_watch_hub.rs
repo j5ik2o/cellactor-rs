@@ -12,13 +12,21 @@ use crate::std::provisioning::provider_event::{ProviderEvent, ProviderTerminatio
 pub struct ProviderWatchHub {
   latest:        RwLock<Option<ProviderSnapshot>>,
   terminated:    RwLock<Option<ProviderTermination>>,
+  last_hash:     RwLock<Option<u64>>,
+  last_invalid:  RwLock<bool>,
   shutting_down: RwLock<bool>,
 }
 
 impl ProviderWatchHub {
   /// Creates a new hub with empty snapshot.
   pub fn new() -> Self {
-    Self { latest: RwLock::new(None), terminated: RwLock::new(None), shutting_down: RwLock::new(false) }
+    Self {
+      latest:        RwLock::new(None),
+      terminated:    RwLock::new(None),
+      last_hash:     RwLock::new(None),
+      last_invalid:  RwLock::new(false),
+      shutting_down: RwLock::new(false),
+    }
   }
 
   /// Applies an incoming provider event.
@@ -29,6 +37,12 @@ impl ProviderWatchHub {
     match event {
       ProviderEvent::Snapshot(s) => {
         let mut latest = self.latest.write().expect("poison");
+        let mut last_hash = self.last_hash.write().expect("poison");
+        let mut last_invalid = self.last_invalid.write().expect("poison");
+
+        let invalidated = last_hash.map_or(false, |prev| prev != s.hash);
+        *last_invalid = invalidated;
+        *last_hash = Some(s.hash);
         *latest = Some(s);
       },
       ProviderEvent::Terminated { reason } => {
@@ -42,6 +56,13 @@ impl ProviderWatchHub {
   /// Returns the latest snapshot if any.
   pub fn latest_snapshot(&self) -> Option<ProviderSnapshot> {
     self.latest.read().expect("poison").clone()
+  }
+
+  /// Returns latest snapshotとハッシュ変化有無をまとめて返す。
+  pub fn latest_snapshot_with_invalidation(&self) -> Option<(ProviderSnapshot, bool)> {
+    let snap = self.latest.read().expect("poison").clone()?;
+    let invalid = *self.last_invalid.read().expect("poison");
+    Some((snap, invalid))
   }
 
   /// Returns termination info if set.
